@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Quantico:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@theme {
+  --font-sans: "Quantico", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  background-color: #130922;
+  color: #ffffff;
+}
+
+/* Glitch Text Effect */
+.glitch-text {
+  position: relative;
+  color: white;
+  font-weight: bold;
+  display: inline-block;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -2px 0 #e028e0;
+  clip: rect(44px, 450px, 56px, 0);
+  animation: glitch-anim 3s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -2px 0 #20e0e0, 2px 2px #e028e0;
+  animation: glitch-anim2 2s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+  0% { clip: rect(11px, 9999px, 83px, 0); }
+  20% { clip: rect(61px, 9999px, 14px, 0); }
+  40% { clip: rect(33px, 9999px, 98px, 0); }
+  60% { clip: rect(87px, 9999px, 22px, 0); }
+  80% { clip: rect(4px, 9999px, 66px, 0); }
+  100% { clip: rect(55px, 9999px, 49px, 0); }
+}
+
+@keyframes glitch-anim2 {
+  0% { clip: rect(65px, 9999px, 100px, 0); }
+  20% { clip: rect(12px, 9999px, 55px, 0); }
+  40% { clip: rect(88px, 9999px, 33px, 0); }
+  60% { clip: rect(44px, 9999px, 77px, 0); }
+  80% { clip: rect(22px, 9999px, 11px, 0); }
+  100% { clip: rect(99px, 9999px, 88px, 0); }
+}
+
+/* Scanlines Overlay */
+.scanlines::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 50;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+/* Cyberpunk Accents */
+.cyber-border {
+  border: 1px solid #20e0e0;
+  box-shadow: 0 0 5px #20e0e0, inset 0 0 5px #20e0e0;
+}
+
+.cyber-border-red {
+  border: 1px solid #e028e0;
+  box-shadow: 0 0 5px #e028e0, inset 0 0 5px #e028e0;
+}
+
+.cyber-bg {
+  background: rgba(32, 224, 224, 0.05);
+}
+
+.cyber-bg-red {
+  background: rgba(224, 40, 224, 0.05);
+}
+
+.cyber-text {
+  color: #20e0e0;
+  text-shadow: 0 0 5px #20e0e0;
+}
+
+.cyber-text-red {
+  color: #e028e0;
+  text-shadow: 0 0 5px #e028e0;
+}

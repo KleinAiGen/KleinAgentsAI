@@ -1,0 +1,5 @@
+{
+  "name": "AgentKlein AI",
+  "description": "An AI-powered chat interface using Gemini Pro, Gwen 3.5 model.",
+  "requestFramePermissions": []
+}
