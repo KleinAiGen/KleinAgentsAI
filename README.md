@@ -29,25 +29,7 @@ AgentKlein AI is an advanced AI-powered chat interface designed for productivity
 - **Data Management:** Export and import chat history easily.
 - **Rich Interaction:** Support for image uploads, code highlighting, and markdown rendering.
 
-## Requirements
-
-- **Node.js:** Ensure you have Node.js installed (v18+ recommended).
-- **API Keys:** You will need a valid `GEMINI_API_KEY` to use the Gemini models.
-
-## Installation
-
-1. Clone the repository (or download the source).
-2. Install the dependencies:
-   ```bash
-   npm install
-
-    Set your environment variables (e.g., GEMINI_API_KEY).
-
-    Start the development server:
-    code Bash
-
-    npm run dev
-
+KleinAgentsAI is a robust multi-agent framework designed to perform autonomous web research, data synthesis, and intelligent content generation. This tool utilizes specialized agents that can search the live web and, if information is unavailable, fallback to internal generative models to provide the best possible response.
 How to Use Agent Search
 
     Click on the "Agent Library" button in the sidebar.
