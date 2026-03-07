@@ -10,6 +10,15 @@ View your app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.e
 
 # AgentKlein AI
 
+**[A powerful, autonomous multi-agent framework for solving complex tasks]**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![GitHub stars](https://img.shields.io/github/stars/KleinAiGen/KleinAgentsAI?style=social)](https://github.com/KleinAiGen/KleinAgentsAI/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/KleinAiGen/KleinAgentsAI)](https://github.com/KleinAiGen/KleinAgentsAI/issues)
+
+</div>
+
 AgentKlein AI is an advanced AI-powered chat interface designed for productivity, development, and data analysis. It leverages powerful models like Gemini Pro and Qwen 3.5 to provide a versatile and intelligent assistant experience.
 
 ## Features
