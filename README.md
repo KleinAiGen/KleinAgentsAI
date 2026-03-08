@@ -13,7 +13,6 @@ View your app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.e
 **[A powerful, autonomous multi-agent framework for solving complex tasks]**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![GitHub stars](https://img.shields.io/github/stars/KleinAiGen/KleinAgentsAI?style=social)](https://github.com/KleinAiGen/KleinAgentsAI/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/KleinAiGen/KleinAgentsAI)](https://github.com/KleinAiGen/KleinAgentsAI/issues)
 
