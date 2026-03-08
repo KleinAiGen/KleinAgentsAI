@@ -2,8 +2,6 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
-
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.europe-west2.run.app
@@ -18,7 +16,7 @@ View your app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.e
 
 </div>
 
-AgentKlein AI is an advanced AI-powered chat interface designed for productivity, development, and data analysis. It leverages powerful models like Gemini Pro and Qwen 3.5 to provide a versatile and intelligent assistant experience.
+AgentKlein AI is an advanced AI-powered chat interface designed for productivity, development, and data analysis. It leverages powerful models like Gemini Flash, Pro 3.1 and Qwen 3.5 to provide a versatile and intelligent assistant experience.
 
 ## Features
 
