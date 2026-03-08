@@ -144,7 +144,7 @@ export default function Chat() {
   const [generatedAgent, setGeneratedAgent] = useState<Agent | null>(null);
   const [isGeneratingAgent, setIsGeneratingAgent] = useState(false);
   const [systemInstruction, setSystemInstruction] = useState(AGENT_LIBRARY[0].systemInstruction);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(true);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [language, setLanguage] = useState<"ENG" | "HUN">("ENG");
   const t = TRANSLATIONS[language];
   const [agentSearchQuery, setAgentSearchQuery] = useState("");
@@ -155,6 +155,8 @@ export default function Chat() {
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [pendingCapabilityMessage, setPendingCapabilityMessage] = useState<string | null>(null);
+  
+  const allAgents = [...AGENT_LIBRARY, ...customAgents];
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -273,8 +275,6 @@ export default function Chat() {
     setPendingCapabilityMessage(cap);
   };
 
-  const allAgents = [...AGENT_LIBRARY, ...customAgents];
-
   const filteredAgents = allAgents.filter(agent => {
     const matchesSearch = agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) || 
                           agent.description.toLowerCase().includes(agentSearchQuery.toLowerCase());
@@ -385,6 +385,99 @@ export default function Chat() {
     }
   };
 
+  const callQwenModel = async (messageText: string, imagesToUse: string[]) => {
+    const messages = [];
+    if (currentSession?.messages) {
+      for (const m of currentSession.messages) {
+        messages.push({
+          role: m.sender === "user" ? "user" : "assistant",
+          text: m.text,
+          images: m.images
+        });
+      }
+    }
+    messages.push({
+      role: "user",
+      text: messageText,
+      images: imagesToUse.length > 0 ? imagesToUse : undefined
+    });
+
+    const effectiveSystemInstruction = `${systemInstruction}\n\nIMPORTANT: You must respond entirely in ${language === "ENG" ? "English" : "Hungarian"}.`;
+    
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "Qwen/Qwen3.5-35B-A3B:novita",
+        systemInstruction: effectiveSystemInstruction,
+        messages
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "Failed to fetch from Qwen API");
+    }
+
+    let finalAiText = "";
+    const aiMessageId = crypto.randomUUID();
+
+    if (isStreaming && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunkStr = decoder.decode(value, { stream: true });
+          const lines = chunkStr.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.text) {
+                  finalAiText += data.text;
+                  setSessions(prev => prev.map(s => {
+                    if (s.id === currentSessionId) {
+                      const lastMsg = s.messages[s.messages.length - 1];
+                      if (lastMsg && lastMsg.id === aiMessageId) {
+                        return { ...s, messages: s.messages.slice(0, -1).concat({ ...lastMsg, text: finalAiText }) };
+                      } else {
+                        return { ...s, messages: [...s.messages, { id: aiMessageId, text: finalAiText, sender: "gemini", timestamp: Date.now() }] };
+                      }
+                    }
+                    return s;
+                  }));
+                }
+              } catch (e) {
+                // Ignore parse errors for incomplete chunks
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // Fallback if not streaming or body missing
+      const data = await response.json();
+      finalAiText = data.text || "";
+      const aiMessage: Message = {
+        id: crypto.randomUUID(),
+        text: finalAiText || "No response.",
+        sender: "gemini",
+        timestamp: Date.now(),
+      };
+      setSessions(prev => prev.map(s => 
+        s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
+      ));
+    }
+
+    if (finalAiText) {
+      generateSuggestions(finalAiText);
+    }
+  };
+
   const sendMessage = async (messageText: string, overrideImages?: string[]) => {
     if (!messageText.trim() && !pendingImages.length && !overrideImages?.length) return;
     if (!currentSessionId) return;
@@ -446,96 +539,7 @@ export default function Chat() {
       } 
       // Handle Qwen via HuggingFace Router
       else if (selectedModel === "Qwen/Qwen3.5-35B-A3B:novita") {
-        const messages = [];
-        if (currentSession?.messages) {
-          for (const m of currentSession.messages) {
-            messages.push({
-              role: m.sender === "user" ? "user" : "assistant",
-              text: m.text,
-              images: m.images
-            });
-          }
-        }
-        messages.push({
-          role: "user",
-          text: messageText,
-          images: imagesToUse.length > 0 ? imagesToUse : undefined
-        });
-
-        const effectiveSystemInstruction = `${systemInstruction}\n\nIMPORTANT: You must respond entirely in ${language === "ENG" ? "English" : "Hungarian"}.`;
-        
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: selectedModel,
-            systemInstruction: effectiveSystemInstruction,
-            messages
-          })
-        });
-
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error || "Failed to fetch from Qwen API");
-        }
-
-        let finalAiText = "";
-        const aiMessageId = crypto.randomUUID();
-
-        if (isStreaming && response.body) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let done = false;
-
-          while (!done) {
-            const { value, done: readerDone } = await reader.read();
-            done = readerDone;
-            if (value) {
-              const chunkStr = decoder.decode(value, { stream: true });
-              const lines = chunkStr.split('\n');
-              for (const line of lines) {
-                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    if (data.text) {
-                      finalAiText += data.text;
-                      setSessions(prev => prev.map(s => {
-                        if (s.id === currentSessionId) {
-                          const lastMsg = s.messages[s.messages.length - 1];
-                          if (lastMsg && lastMsg.id === aiMessageId) {
-                            return { ...s, messages: s.messages.slice(0, -1).concat({ ...lastMsg, text: finalAiText }) };
-                          } else {
-                            return { ...s, messages: [...s.messages, { id: aiMessageId, text: finalAiText, sender: "gemini", timestamp: Date.now() }] };
-                          }
-                        }
-                        return s;
-                      }));
-                    }
-                  } catch (e) {
-                    // Ignore parse errors for incomplete chunks
-                  }
-                }
-              }
-            }
-          }
-        } else {
-          // Fallback if not streaming or body missing
-          const data = await response.json();
-          finalAiText = data.text || "";
-          const aiMessage: Message = {
-            id: crypto.randomUUID(),
-            text: finalAiText || "No response.",
-            sender: "gemini",
-            timestamp: Date.now(),
-          };
-          setSessions(prev => prev.map(s => 
-            s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
-          ));
-        }
-
-        if (finalAiText) {
-          generateSuggestions(finalAiText);
-        }
+        await callQwenModel(messageText, imagesToUse);
       }
       // Handle Chat Models
       else {
@@ -633,6 +637,17 @@ export default function Chat() {
       }
     } catch (error) {
       console.error("Error:", error);
+      
+      // Fallback to Qwen if Gemini fails
+      if (selectedModel !== "Qwen/Qwen3.5-35B-A3B:novita" && selectedModel !== "gemini-2.5-flash-image") {
+        try {
+          console.log("Gemini failed, falling back to Qwen...");
+          await callQwenModel(messageText, imagesToUse);
+          return; // Success
+        } catch (qwenError) {
+          console.error("Qwen fallback failed too:", qwenError);
+        }
+      }
       
       let errorText = "Error: " + (error instanceof Error ? error.message : "Something went wrong.");
       
@@ -738,13 +753,32 @@ export default function Chat() {
             exit={{ x: -300, opacity: 0 }}
             className="fixed md:relative w-72 h-full bg-[#050505] border-r border-[#b020ff]/30 flex flex-col z-20 shadow-[0_0_15px_rgba(0,255,249,0.1)] md:shadow-none"
           >
-            <div className="p-4 border-bottom border-[#b020ff]/30">
+            <div className="p-4 border-bottom border-[#b020ff]/30 flex items-center gap-2">
               <button
                 onClick={createNewChat}
-                className="w-full flex items-center justify-center gap-2 bg-[#e028e0] hover:bg-[#e028e0]/80 text-white py-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(255,0,60,0.5)]"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#e028e0] hover:bg-[#e028e0]/80 text-white py-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(255,0,60,0.5)]"
               >
                 <Plus size={18} />
                 <span className="font-medium">{t.newChat}</span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (sessions.length > 1) {
+                    deleteSession(currentSessionId, e);
+                  }
+                }}
+                className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"
+                title="Delete Current Chat"
+              >
+                <Trash2 size={18} />
+              </button>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-2.5 bg-[#ffc020]/10 hover:bg-[#ffc020]/20 text-[#ffc020] rounded-xl transition-all md:hidden"
+                title="Close Sidebar"
+              >
+                <Menu size={18} />
               </button>
             </div>
 
@@ -843,7 +877,7 @@ export default function Chat() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-[#111] rounded-lg text-[#e028e0]/80 transition-colors"
+              className="p-2 hover:bg-[#111] rounded-lg text-[#ffc020] transition-colors"
             >
               <Menu size={20} />
             </button>
@@ -1440,7 +1474,7 @@ export default function Chat() {
                 </div>
                 <button 
                   className="text-xs text-[#e028e0] hover:underline font-bold"
-                  onClick={() => window.open('https://github.com', '_blank')}
+                  onClick={() => window.open('https://github.com/KleinAiGen/KleinAgentsAI', '_blank')}
                 >
                   Browse GitHub Repository
                 </button>
