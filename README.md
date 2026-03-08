@@ -1,4 +1,5 @@
-K L E I N    A G E N T S   A I
+<img width="3120" height="1440" alt="Screenshot_20260308-103011" src="https://github.com/user-attachments/assets/96545bf8-99f8-4695-8f03-4aa48640ef87" />
+
 
 
 more than a chat, it is a Agent and Skill creator PLAYGROUND.
