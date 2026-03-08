@@ -1,11 +1,13 @@
 K L E I N    A G E N T S   A I
+
+
 more than a chat, it is a Agent and Skill creator PLAYGROUND.
 
 Run and deploy your AI Studio app
 
 This contains everything you need to run your app locally.
 
-View m app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.europe-west2.run.app
+View my app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.europe-west2.run.app
 AgentKlein AI
 
 [A powerful, autonomous multi-agent framework for solving complex tasks]
