@@ -81,7 +81,9 @@ const TRANSLATIONS = {
     describeImage: "Describe the image to generate...",
     askGemini: "Ask Gemini anything...",
     uploadImageTitle: "Upload Image",
-    clearChatTitle: "Clear Chat"
+    clearChatTitle: "Clear Chat",
+    agentGenerator: "Agent Skill Generator",
+    createCustomAgents: "Create Custom Agents"
   },
   HUN: {
     newChat: "Új Csevegés",
@@ -116,7 +118,9 @@ const TRANSLATIONS = {
     describeImage: "Írd le a generálandó képet...",
     askGemini: "Kérdezz bármit a Geminitől...",
     uploadImageTitle: "Kép Feltöltése",
-    clearChatTitle: "Csevegés Törlése"
+    clearChatTitle: "Csevegés Törlése",
+    agentGenerator: "Ügynök Készség Generátor",
+    createCustomAgents: "Egyedi Ügynökök Készítése"
   }
 };
 
@@ -751,7 +755,7 @@ export default function Chat() {
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
-            className="fixed md:relative w-72 h-full bg-[#050505] border-r border-[#b020ff]/30 flex flex-col z-20 shadow-[0_0_15px_rgba(0,255,249,0.1)] md:shadow-none"
+            className="fixed md:relative w-4/5 md:w-72 h-full bg-[#050505] border-r border-[#b020ff]/30 flex flex-col z-20 shadow-[0_0_15px_rgba(0,255,249,0.1)] md:shadow-none"
           >
             <div className="p-4 border-bottom border-[#b020ff]/30 flex items-center gap-2">
               <button
@@ -830,6 +834,22 @@ export default function Chat() {
             </div>
 
             <div className="p-4 border-t border-[#b020ff]/30 space-y-4">
+              <button
+                onClick={() => {
+                  const generator = AGENT_LIBRARY.find(a => a.id === "agent-generator");
+                  if (generator) selectAgent(generator);
+                }}
+                className="w-full flex items-center gap-3 p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#20e0e0]/30"
+              >
+                <div className="p-2 bg-[#20e0e0]/10 rounded-lg text-[#20e0e0]">
+                  <Cpu size={16} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-bold">{t.agentGenerator}</span>
+                  <span className="text-[10px] text-[#a0a0b0]/60">{t.createCustomAgents}</span>
+                </div>
+              </button>
+
               <button
                 onClick={() => setIsLibraryOpen(true)}
                 className="w-full flex items-center gap-3 p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#e028e0]/30"
