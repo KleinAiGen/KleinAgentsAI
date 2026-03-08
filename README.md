@@ -1,4 +1,5 @@
 <img width="3120" height="1440" alt="Screenshot_20260308-103011" src="https://github.com/user-attachments/assets/96545bf8-99f8-4695-8f03-4aa48640ef87" />
+<img width="3120" height="1440" alt="Screenshot_20260308-111449" src="https://github.com/user-attachments/assets/93d7be7b-f29e-4c90-976e-102b20f90e6b" />
 
 
 
@@ -12,8 +13,6 @@ View my app in AI Studio: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.eur
 AgentKlein AI
 
 [A powerful, autonomous multi-agent framework for solving complex tasks]
-
-License: MIT Python Version GitHub stars GitHub issues
 
 AgentKlein AI is an advanced AI-powered chat interface designed for productivity, development, and data analysis. It leverages powerful models like Gemini Pro and Qwen 3.5 to provide a versatile and intelligent assistant experience.
 Features
