@@ -1,9 +1,6 @@
-# AgentKlein AI ENG-HUN 
-(Engineer Swiss-Army Knife)
+# AgentKlein AI
 
 AgentKlein AI is an advanced AI-powered chat interface designed for productivity, development, and data analysis. It leverages powerful models like Gemini Pro and Qwen 3.5 to provide a versatile and intelligent assistant experience.
-
-https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.europe-west2.run.app 
 
 ## Features
 
@@ -13,19 +10,22 @@ https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.europe-west2.run.app
 - **Data Management:** Export and import chat history easily.
 - **Rich Interaction:** Support for image uploads, code highlighting, and markdown rendering.
 
-AgentKlein AI✨ chat és ügynök, képesség készitö 🦈
+## Requirements
 
-/ENG-HUN/ magyarra át váltható az app, chat, MI.
-Ezzel bármilyen helyzetben tudsz generálni uj, ujjabb ügynököt ha nincs a listában. 
-Ez tartalmaz mindent, amire szükséged van az alkalmazás helyi futtatásához.
+- **Node.js:** Ensure you have Node.js installed (v18+ recommended).
+- **API Keys:** You will need a valid `GEMINI_API_KEY` to use the Gemini models.
 
-👀Az alkalmazás megtekintése az AI Studio-ban: https://ais-dev-oabdlmwafoilv7dupa5fz7-43395094581.europe-west2.run.app 
+## Installation
 
-AgentKlein AI✨
-
-[Erőteljes, autonóm többügynökös keretrendszer komplex feladatok megoldásához]
-
-Az AgentKlein AI egy fejlett, AI-alapú csevegőfelület, amelyet a termelékenység, a fejlesztés és az adatelemzés céljára terveztek. Hatékony modelleket, például a Gemini Pro-t és a Qwen 3.5-öt használja, hogy sokoldalú és intelligens asszisztensi élményt nyújtson.
+1. Clone the repository (or download the source).
+2. Install the dependencies:
+   ```bash
+   npm install
+   ```
+3. Set your environment variables (e.g., `GEMINI_API_KEY`).
+4. Start the development server:
+   ```bash
+   npm run dev
    ```
 
 ## How to Use Agent Search

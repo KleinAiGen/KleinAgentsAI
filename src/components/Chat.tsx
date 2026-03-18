@@ -8,12 +8,12 @@ import {
   Sparkles, History, MessageSquare, Save,
   Share2, MoreVertical, ShieldCheck, Zap, Database, Layout, Beaker, Search,
   Terminal, Server, Cloud, Briefcase, PenTool, Activity, LineChart, Smartphone, TerminalSquare, Code, Shield, Cpu, Globe,
-  Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, Box, Map, Eye, Type as TypeIcon, Brain
+  Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, Box, Map as MapIcon, Eye, Type as TypeIcon, Brain
 } from "lucide-react";
 import { AGENT_LIBRARY, type Agent, type AgentCategory } from "../data/agents";
 
 const ICON_MAP: Record<string, any> = {
-  Sparkles, History, MessageSquare, Save, Share2, MoreVertical, ShieldCheck, Zap, Database, Layout, Beaker, Search, Terminal, Server, Cloud, Briefcase, PenTool, Activity, LineChart, Smartphone, TerminalSquare, Code, Shield, Cpu, Globe, Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, FileText, Settings, Image: ImageIcon, Box, Map, Eye, Type: TypeIcon, Brain
+  Sparkles, History, MessageSquare, Save, Share2, MoreVertical, ShieldCheck, Zap, Database, Layout, Beaker, Search, Terminal, Server, Cloud, Briefcase, PenTool, Activity, LineChart, Smartphone, TerminalSquare, Code, Shield, Cpu, Globe, Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, FileText, Settings, Image: ImageIcon, Box, Map: MapIcon, Eye, Type: TypeIcon, Brain
 };
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -140,9 +140,33 @@ export default function Chat() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
+  
+  // Obfuscated database key and helpers
+  const DB_KEY = atob("Y3VzdG9tX2FnZW50c19kYg==");
+  const obfuscate = (data: any) => btoa(JSON.stringify(data));
+  const deobfuscate = (data: string) => {
+    try {
+      return JSON.parse(atob(data));
+    } catch (e) {
+      // Fallback for old un-obfuscated data
+      return JSON.parse(data);
+    }
+  };
+
   const [customAgents, setCustomAgents] = useState<Agent[]>(() => {
-    const saved = localStorage.getItem("gemini_custom_agents");
-    return saved ? JSON.parse(saved) : [];
+    const saved = localStorage.getItem(DB_KEY);
+    if (saved) {
+      try {
+        const parsed = deobfuscate(saved);
+        if (Array.isArray(parsed)) {
+          const uniqueAgents = Array.from(new Map(parsed.map(a => [a.id, a])).values()) as Agent[];
+          return uniqueAgents;
+        }
+      } catch (e) {
+        console.error("Failed to parse custom agents", e);
+      }
+    }
+    return [];
   });
   const [activeAgent, setActiveAgent] = useState<Agent>(AGENT_LIBRARY[0]);
   const [generatedAgent, setGeneratedAgent] = useState<Agent | null>(null);
@@ -170,7 +194,7 @@ export default function Chat() {
 
   // Persistence
   useEffect(() => {
-    localStorage.setItem("gemini_custom_agents", JSON.stringify(customAgents));
+    localStorage.setItem(DB_KEY, obfuscate(customAgents));
   }, [customAgents]);
   useEffect(() => {
     const saved = localStorage.getItem("gemini_chats");
@@ -315,7 +339,10 @@ export default function Chat() {
         }
       });
       
-      const data = JSON.parse(response.text);
+      let text = response.text || "{}";
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const data = JSON.parse(text);
+      
       setGeneratedAgent({
         ...data,
         id: `custom-${Date.now()}`
@@ -329,18 +356,30 @@ export default function Chat() {
 
   const saveGeneratedAgent = () => {
     if (generatedAgent) {
-      setCustomAgents(prev => [...prev, generatedAgent]);
+      setCustomAgents(prev => {
+        if (prev.some(a => a.id === generatedAgent.id)) return prev;
+        return [...prev, generatedAgent];
+      });
       setGeneratedAgent(null);
       setAgentSearchQuery("");
     }
   };
 
   const deleteCustomAgent = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
     e.stopPropagation();
-    setCustomAgents(prev => prev.filter(a => a.id !== id));
-    if (activeAgent.id === id) {
-      setActiveAgent(AGENT_LIBRARY[0]);
-      setSystemInstruction(AGENT_LIBRARY[0].systemInstruction);
+    try {
+      setCustomAgents(prev => {
+        const next = prev.filter(a => a.id !== id);
+        localStorage.setItem("gemini_custom_agents", JSON.stringify(next));
+        return next;
+      });
+      if (activeAgent?.id === id) {
+        setActiveAgent(AGENT_LIBRARY[0]);
+        setSystemInstruction(AGENT_LIBRARY[0].systemInstruction);
+      }
+    } catch (err) {
+      console.error("Failed to delete agent", err);
     }
   };
 
@@ -755,7 +794,7 @@ export default function Chat() {
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
-            className="fixed md:relative w-4/5 md:w-72 h-full bg-[#050505] border-r border-[#b020ff]/30 flex flex-col z-20 shadow-[0_0_15px_rgba(0,255,249,0.1)] md:shadow-none"
+            className="fixed md:relative w-72 h-full bg-[#050505] border-r border-[#b020ff]/30 flex flex-col z-20 shadow-[0_0_15px_rgba(0,255,249,0.1)] md:shadow-none"
           >
             <div className="p-4 border-bottom border-[#b020ff]/30 flex items-center gap-2">
               <button
@@ -1275,7 +1314,25 @@ export default function Chat() {
               <div className="flex flex-1 overflow-hidden">
                 {/* Categories Sidebar */}
                 <div className="w-48 bg-[#050505]/30 border-r border-[#b020ff]/30 p-4 overflow-y-auto hidden md:block">
-                  <h3 className="text-[10px] font-bold text-[#4060ff]/80 uppercase tracking-widest mb-3 px-2">{t.categories}</h3>
+                  <div className="flex items-center justify-between mb-3 px-2">
+                    <h3 className="text-[10px] font-bold text-[#4060ff]/80 uppercase tracking-widest">{t.categories}</h3>
+                    {customAgents.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          setCustomAgents([]);
+                          localStorage.removeItem("gemini_custom_agents");
+                          if (activeAgent?.id.startsWith('custom-')) {
+                            setActiveAgent(AGENT_LIBRARY[0]);
+                            setSystemInstruction(AGENT_LIBRARY[0].systemInstruction);
+                          }
+                        }}
+                        className="text-[10px] text-red-500 hover:text-red-400 transition-colors"
+                        title="Clear All Custom Agents"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
                   <div className="space-y-1">
                     {categories.map(cat => (
                       <button
@@ -1439,7 +1496,7 @@ export default function Chat() {
                               {agent.id.startsWith('custom-') && (
                                 <button 
                                   onClick={(e) => deleteCustomAgent(e, agent.id)}
-                                  className="p-1.5 bg-[#e028e0]/10 text-[#e028e0]/60 hover:bg-[#e028e0]/20 hover:text-[#e028e0] rounded-lg transition-colors"
+                                  className="p-1.5 bg-[#e028e0]/10 text-[#e028e0]/60 hover:bg-[#e028e0]/20 hover:text-[#e028e0] rounded-lg transition-colors relative z-10"
                                   title="Delete Custom Agent"
                                 >
                                   <Trash2 size={16} />
