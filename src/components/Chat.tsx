@@ -1,4 +1,3 @@
-import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -8,12 +7,20 @@ import {
   Sparkles, History, MessageSquare, Save,
   Share2, MoreVertical, ShieldCheck, Zap, Database, Layout, Beaker, Search,
   Terminal, Server, Cloud, Briefcase, PenTool, Activity, LineChart, Smartphone, TerminalSquare, Code, Shield, Cpu, Globe,
-  Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, Box, Map as MapIcon, Eye, Type as TypeIcon, Brain
+  Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, Box, Map as MapIcon, Eye, Type as TypeIcon, Brain,
+  Volume2, VolumeX, Sliders, Play, Layers, ArrowRight, CornerRightDown, RefreshCw
 } from "lucide-react";
 import { AGENT_LIBRARY, type Agent, type AgentCategory } from "../data/agents";
+import { CLAUDE_COMMANDS, type ClaudeCommand } from "../data/commands";
+import { DEFAULT_PLUGINS, SpeechReader, estimateTokens, type TerminalPlugin } from "../data/plugins";
+import { useAgentPersistence } from "../hooks/useAgentPersistence";
+import ClaudeCommandsModal from "./ClaudeCommandsModal";
+import CommandPalettePopup from "./CommandPalettePopup";
+import PluginConsoleModal from "./PluginConsoleModal";
+import AgentCreatorModal from "./AgentCreatorModal";
 
 const ICON_MAP: Record<string, any> = {
-  Sparkles, History, MessageSquare, Save, Share2, MoreVertical, ShieldCheck, Zap, Database, Layout, Beaker, Search, Terminal, Server, Cloud, Briefcase, PenTool, Activity, LineChart, Smartphone, TerminalSquare, Code, Shield, Cpu, Globe, Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, FileText, Settings, Image: ImageIcon, Box, Map: MapIcon, Eye, Type: TypeIcon, Brain
+  Sparkles, History, MessageSquare, Save, Share2, MoreVertical, ShieldCheck, Zap, Database, Layout, Beaker, Search, Terminal, Server, Cloud, Briefcase, PenTool, Activity, LineChart, Smartphone, TerminalSquare, Code, Shield, Cpu, Globe, Wrench, Lock, Key, PieChart, BarChart, TrendingUp, Megaphone, Target, Camera, Video, Music, Book, GraduationCap, Scale, HeartPulse, Leaf, Plane, DollarSign, ShoppingCart, Calendar, Clock, CheckSquare, List, MessageCircle, Mail, Phone, Users, FileText, Settings, Image: ImageIcon, Box, Map: MapIcon, Eye, Type: TypeIcon, Brain, Volume2, VolumeX, Sliders, Play, Layers
 };
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -36,6 +43,8 @@ interface Message {
   images?: string[]; // Base64 images
   isImageGeneration?: boolean;
   groundingChunks?: any[];
+  appliedCommand?: string;
+  suggestions?: string[];
 }
 
 interface ChatSession {
@@ -45,6 +54,7 @@ interface ChatSession {
   createdAt: number;
   model: string;
   systemInstruction: string;
+  suggestedPrompts?: string[];
 }
 
 const TRANSLATIONS = {
@@ -52,8 +62,8 @@ const TRANSLATIONS = {
     newChat: "New Chat",
     agentLibrary: "Agent Library",
     howCanIHelp: "How can I help you today?",
-    selectModel: "Select a model and start a conversation. You can upload images or generate them too.",
-    typeMessage: "Type a message...",
+    selectModel: "Select a model and start a conversation. You can upload images, use 43 Claude Commands, or run terminal plugins.",
+    typeMessage: "Type a message or / for commands...",
     send: "Send",
     exportPDF: "Export to PDF",
     systemInstruction: "System Instruction",
@@ -67,7 +77,7 @@ const TRANSLATIONS = {
     commands: "Commands",
     skills: "Skills",
     chooseSpecialist: "Choose a specialist for your task from the community repository",
-    geminiProcessing: "Gemini is processing...",
+    geminiProcessing: "AI Terminal is processing...",
     availableCommands: "Available Commands",
     attachImage: "Attach image",
     uploadImage: "Upload image",
@@ -79,18 +89,31 @@ const TRANSLATIONS = {
     capabilities: "Capabilities",
     startChat: "Start Chat",
     describeImage: "Describe the image to generate...",
-    askGemini: "Ask Gemini anything...",
-    uploadImageTitle: "Upload Image",
+    askGemini: "Type message or /command (e.g. /godmode, /debug, /10x)...",
+    uploadImageTitle: "Upload File / Image / Code",
     clearChatTitle: "Clear Chat",
     agentGenerator: "Agent Skill Generator",
-    createCustomAgents: "Create Custom Agents"
+    createCustomAgents: "Create Custom Agents",
+    claudeCommandsBtn: "Claude Commands (43)",
+    pluginsBtn: "Plugins & Scripts",
+    terminalMode: "Terminal Mode",
+    listen: "Listen",
+    stop: "Stop",
+    armedCommand: "Active Command Mode:",
+    quickCommandsTitle: "POPULAR COMMANDS:",
+    openPlaybook: "Open All 43 Commands",
+    suggestedFollowUps: "Dynamic Follow-up Prompts",
+    dynamicPrompts: "Dynamic Prompts",
+    generatePrompts: "Generate Dynamic Prompts",
+    generatingPrompts: "Generating Prompts...",
+    regenerate: "Regenerate"
   },
   HUN: {
     newChat: "Új Csevegés",
     agentLibrary: "Ügynök Könyvtár",
     howCanIHelp: "Miben segíthetek ma?",
-    selectModel: "Válassz egy modellt és kezdj egy beszélgetést. Képeket is feltölthetsz vagy generálhatsz.",
-    typeMessage: "Írj egy üzenetet...",
+    selectModel: "Válassz modellt és indíts beszélgetést. Használhatsz fájlfeltöltést, 43 Claude parancsot és terminál pluginokat.",
+    typeMessage: "Írj üzenetet vagy / a parancsokhoz...",
     send: "Küldés",
     exportPDF: "Exportálás PDF-be",
     systemInstruction: "Rendszer Utasítás",
@@ -104,7 +127,7 @@ const TRANSLATIONS = {
     commands: "Parancsok",
     skills: "Készségek",
     chooseSpecialist: "Válassz egy specialistát a feladatodhoz a közösségi tárból",
-    geminiProcessing: "A Gemini feldolgozza...",
+    geminiProcessing: "Az AI Terminál feldolgozza...",
     availableCommands: "Elérhető Parancsok",
     attachImage: "Kép csatolása",
     uploadImage: "Kép feltöltése",
@@ -116,19 +139,33 @@ const TRANSLATIONS = {
     capabilities: "Képességek",
     startChat: "Csevegés Indítása",
     describeImage: "Írd le a generálandó képet...",
-    askGemini: "Kérdezz bármit a Geminitől...",
-    uploadImageTitle: "Kép Feltöltése",
+    askGemini: "Írj üzenetet vagy /parancsot (pl. /godmode, /debug, /10x)...",
+    uploadImageTitle: "Fájl / Kép / Kód feltöltése",
     clearChatTitle: "Csevegés Törlése",
     agentGenerator: "Ügynök Készség Generátor",
-    createCustomAgents: "Egyedi Ügynökök Készítése"
+    createCustomAgents: "Egyedi Ügynökök Készítése",
+    claudeCommandsBtn: "Claude Parancsok (43)",
+    pluginsBtn: "Bővítmények & Scriptek",
+    terminalMode: "Terminál Üzemmód",
+    listen: "Felolvasás",
+    stop: "Leállítás",
+    armedCommand: "Aktív Parancsmód:",
+    quickCommandsTitle: "GYORSPARANCSOK:",
+    openPlaybook: "Összes 43 Parancs Megnyitása",
+    suggestedFollowUps: "Dinamikus Promptok & Folytatási Kérdések",
+    dynamicPrompts: "Dinamikus Promptok",
+    generatePrompts: "Dinamikus promptok generálása",
+    generatingPrompts: "Promptok generálása...",
+    regenerate: "Újragenerálás"
   }
 };
 
 const MODELS = [
-  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", description: "Most capable model" },
-  { id: "gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Fast and efficient" },
-  { id: "gemini-2.5-flash-image", name: "Gemini Image Gen", description: "Generate images from text" },
-  { id: "Qwen/Qwen3.5-35B-A3B:novita", name: "Qwen 3.5 35B", description: "Reasoning and Coding Assistant" },
+  { id: "gemini-3.7-flash", name: "Gemini 3.7 Flash", description: "Fast, intelligent & recommended" },
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "High stability standard model" },
+  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", description: "Deep reasoning & code analysis" },
+  { id: "gemini-3.1-flash-image", name: "Gemini Image Gen", description: "Generate images from text prompts" },
+  { id: "Qwen/Qwen3.5-35B-A3B:novita", name: "Qwen 3.5 35B", description: "Open source reasoning assistant" },
 ];
 
 export default function Chat() {
@@ -138,39 +175,16 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
   const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
   
-  // Obfuscated database key and helpers
-  const DB_KEY = atob("Y3VzdG9tX2FnZW50c19kYg==");
-  const obfuscate = (data: any) => btoa(JSON.stringify(data));
-  const deobfuscate = (data: string) => {
-    try {
-      return JSON.parse(atob(data));
-    } catch (e) {
-      // Fallback for old un-obfuscated data
-      return JSON.parse(data);
-    }
-  };
-
-  const [customAgents, setCustomAgents] = useState<Agent[]>(() => {
-    const saved = localStorage.getItem(DB_KEY);
-    if (saved) {
-      try {
-        const parsed = deobfuscate(saved);
-        if (Array.isArray(parsed)) {
-          const uniqueAgents = Array.from(new Map(parsed.map(a => [a.id, a])).values()) as Agent[];
-          return uniqueAgents;
-        }
-      } catch (e) {
-        console.error("Failed to parse custom agents", e);
-      }
-    }
-    return [];
-  });
+  // Persistent Custom Agents Hook
+  const { customAgents, saveAgent, deleteAgent: removeAgentFromStorage, setCustomAgents } = useAgentPersistence();
+  
   const [activeAgent, setActiveAgent] = useState<Agent>(AGENT_LIBRARY[0]);
   const [generatedAgent, setGeneratedAgent] = useState<Agent | null>(null);
   const [isGeneratingAgent, setIsGeneratingAgent] = useState(false);
+  const [isAgentCreatorOpen, setIsAgentCreatorOpen] = useState(false);
   const [systemInstruction, setSystemInstruction] = useState(AGENT_LIBRARY[0].systemInstruction);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [language, setLanguage] = useState<"ENG" | "HUN">("ENG");
@@ -178,11 +192,48 @@ export default function Chat() {
   const [agentSearchQuery, setAgentSearchQuery] = useState("");
   const [agentCategory, setAgentCategory] = useState<AgentCategory | "All">("All");
   const [showCommandMenu, setShowCommandMenu] = useState(false);
-  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<string[]>([]);
   const [isStreaming, setIsStreaming] = useState(true);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [pendingCapabilityMessage, setPendingCapabilityMessage] = useState<string | null>(null);
+
+  // Claude Commands & Plugins State
+  const [isClaudeModalOpen, setIsClaudeModalOpen] = useState(false);
+  const [isPluginModalOpen, setIsPluginModalOpen] = useState(false);
+  const [activeCommand, setActiveCommand] = useState<ClaudeCommand | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [commandPaletteFilter, setCommandPaletteFilter] = useState("");
+  const [commandPaletteSelectedIndex, setCommandPaletteSelectedIndex] = useState(0);
+  const [operatingMode, setOperatingMode] = useState<"standard" | "claude_terminal" | "sandbox">("claude_terminal");
+  const [plugins, setPlugins] = useState<TerminalPlugin[]>(() => {
+    const saved = localStorage.getItem("terminal_plugins");
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_PLUGINS;
+  });
+
+  const togglePlugin = (id: string) => {
+    setPlugins(prev => {
+      const next = prev.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p);
+      localStorage.setItem("terminal_plugins", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleToggleTTS = (messageId: string, text: string) => {
+    if (speakingMessageId === messageId) {
+      SpeechReader.stop();
+      setSpeakingMessageId(null);
+    } else {
+      const lang = language === "ENG" ? "en-US" : "hu-HU";
+      const started = SpeechReader.speak(text, () => setSpeakingMessageId(null), lang);
+      if (started) {
+        setSpeakingMessageId(messageId);
+      }
+    }
+  };
   
   const allAgents = [...AGENT_LIBRARY, ...customAgents];
   
@@ -193,9 +244,6 @@ export default function Chat() {
   const currentSession = sessions.find(s => s.id === currentSessionId);
 
   // Persistence
-  useEffect(() => {
-    localStorage.setItem(DB_KEY, obfuscate(customAgents));
-  }, [customAgents]);
   useEffect(() => {
     const saved = localStorage.getItem("gemini_chats");
     if (saved) {
@@ -216,6 +264,24 @@ export default function Chat() {
       localStorage.setItem("gemini_chats", JSON.stringify(sessions));
     }
   }, [sessions]);
+
+  useEffect(() => {
+    if (!currentSessionId) return;
+    const current = sessions.find(s => s.id === currentSessionId);
+    if (current) {
+      if (current.suggestedPrompts && current.suggestedPrompts.length > 0) {
+        setSuggestedPrompts(current.suggestedPrompts);
+      } else {
+        const aiMsgs = current.messages.filter(m => m.sender === "gemini");
+        const lastAi = aiMsgs[aiMsgs.length - 1];
+        if (lastAi?.suggestions && lastAi.suggestions.length > 0) {
+          setSuggestedPrompts(lastAi.suggestions);
+        } else {
+          setSuggestedPrompts([]);
+        }
+      }
+    }
+  }, [currentSessionId]);
 
   useEffect(() => {
     if (pendingCapabilityMessage && currentSessionId && !loading) {
@@ -242,6 +308,9 @@ export default function Chat() {
     };
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
   };
 
   const deleteSession = (id: string, e: React.MouseEvent) => {
@@ -255,17 +324,40 @@ export default function Chat() {
     });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
     Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPendingImages(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+      const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
+      
+      if (isImg) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result) {
+            setPendingFiles(prev => [...prev, reader.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Text or code file (.ts, .js, .py, .json, .txt, .md, .html, .css, etc.)
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const content = reader.result as string;
+          if (content) {
+            const ext = file.name.split('.').pop() || '';
+            const formattedAttachment = `\n\n\`\`\`${ext}\n// File: ${file.name}\n${content}\n\`\`\`\n\n`;
+            setInput(prev => prev ? `${prev}${formattedAttachment}` : `Please analyze this file (${file.name}):${formattedAttachment}`);
+          }
+        };
+        reader.readAsText(file);
+      }
     });
+
+    // Reset file input value so same file can be uploaded again if needed
+    if (e.target) {
+      e.target.value = '';
+    }
   };
 
   const selectAgent = (agent: Agent) => {
@@ -273,6 +365,9 @@ export default function Chat() {
     setSystemInstruction(agent.systemInstruction);
     setIsLibraryOpen(false);
     setAgentSearchQuery("");
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
     // Optionally update current session's system instruction
     if (currentSessionId) {
       setSessions(prev => prev.map(s => 
@@ -317,36 +412,17 @@ export default function Chat() {
     setIsGeneratingAgent(true);
     setGeneratedAgent(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Generate an AI agent profile based on this search query: "${agentSearchQuery}".
-        Return ONLY a JSON object with this exact structure (no markdown formatting, just raw JSON):
-        {
-          "id": "generated-id",
-          "name": "Agent Name",
-          "description": "Short description of what the agent does.",
-          "systemInstruction": "Detailed system instruction for the AI persona.",
-          "icon": "Sparkles",
-          "category": "Custom",
-          "capabilities": ["Capability 1", "Capability 2", "Capability 3"],
-          "commands": [
-            { "command": "/analyze", "description": "Analyze the input", "prompt": "Analyze this: " }
-          ]
-        }`,
-        config: {
-          responseMimeType: "application/json",
-        }
+      const res = await fetch("/api/generate-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: agentSearchQuery })
       });
-      
-      let text = response.text || "{}";
-      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const data = JSON.parse(text);
-      
-      setGeneratedAgent({
-        ...data,
-        id: `custom-${Date.now()}`
-      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || err.error || "Failed to generate agent");
+      }
+      const data = await res.json();
+      setGeneratedAgent(data);
     } catch (error) {
       console.error("Failed to generate agent:", error);
     } finally {
@@ -356,10 +432,7 @@ export default function Chat() {
 
   const saveGeneratedAgent = () => {
     if (generatedAgent) {
-      setCustomAgents(prev => {
-        if (prev.some(a => a.id === generatedAgent.id)) return prev;
-        return [...prev, generatedAgent];
-      });
+      saveAgent(generatedAgent);
       setGeneratedAgent(null);
       setAgentSearchQuery("");
     }
@@ -369,11 +442,7 @@ export default function Chat() {
     e.preventDefault();
     e.stopPropagation();
     try {
-      setCustomAgents(prev => {
-        const next = prev.filter(a => a.id !== id);
-        localStorage.setItem("gemini_custom_agents", JSON.stringify(next));
-        return next;
-      });
+      removeAgentFromStorage(id);
       if (activeAgent?.id === id) {
         setActiveAgent(AGENT_LIBRARY[0]);
         setSystemInstruction(AGENT_LIBRARY[0].systemInstruction);
@@ -387,8 +456,35 @@ export default function Chat() {
     setInput(val);
     if (val.startsWith("/")) {
       setShowCommandMenu(true);
+      setCommandPaletteFilter(val);
+      setCommandPaletteSelectedIndex(0);
     } else {
       setShowCommandMenu(false);
+      setCommandPaletteFilter("");
+    }
+  };
+
+  const handleSelectClaudeCommand = (cmd: ClaudeCommand, immediateExecute = false) => {
+    setActiveCommand(cmd);
+    setIsClaudeModalOpen(false);
+    setShowCommandMenu(false);
+
+    // If input already has /something, clean it
+    let cleanInput = input;
+    if (cleanInput.startsWith("/")) {
+      cleanInput = cleanInput.replace(/^\/\S*\s*/, "").trim();
+      setInput(cleanInput);
+    }
+
+    if (immediateExecute && cleanInput) {
+      handleSendWithCommand(cleanInput, cmd);
+    }
+  };
+
+  const handleTransformMessage = (cmdName: string, targetText: string) => {
+    const targetCmd = CLAUDE_COMMANDS.find(c => c.command === cmdName);
+    if (targetCmd) {
+      sendMessage(`${targetCmd.prompt}\n\n"${targetText}"`);
     }
   };
 
@@ -399,28 +495,35 @@ export default function Chat() {
     setShowCommandMenu(false);
   };
 
-  const generateSuggestions = async (lastAiMessage: string) => {
-    if (!lastAiMessage || selectedModel === "gemini-2.5-flash-image") return;
+  const generateSuggestions = async (lastAiMessage: string, messageId?: string) => {
+    if (!lastAiMessage || selectedModel.includes("image")) return;
     
     setIsGeneratingSuggestions(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Based on this AI response, generate 4 "Prompt Engineer level" follow-up prompts that a professional would ask to dive deeper, optimize, or expand on the topic. Return ONLY a JSON array of strings.
-        
-        AI Response: "${lastAiMessage.slice(0, 1000)}"`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-          }
-        }
+      const res = await fetch("/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: lastAiMessage, language })
       });
-      
-      const suggestions = JSON.parse(response.text || "[]");
-      setSuggestedPrompts(Array.isArray(suggestions) ? suggestions.slice(0, 4) : []);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+          const suggestions = data.suggestions.slice(0, 4);
+          setSuggestedPrompts(suggestions);
+          
+          setSessions(prev => prev.map(s => {
+            if (s.id === currentSessionId) {
+              const updatedMessages = s.messages.map(m => 
+                (messageId && m.id === messageId) || (!messageId && m.sender === "gemini" && m.text === lastAiMessage)
+                  ? { ...m, suggestions }
+                  : m
+              );
+              return { ...s, suggestedPrompts: suggestions, messages: updatedMessages };
+            }
+            return s;
+          }));
+        }
+      }
     } catch (error) {
       console.error("Failed to generate suggestions", error);
     } finally {
@@ -428,106 +531,38 @@ export default function Chat() {
     }
   };
 
-  const callQwenModel = async (messageText: string, imagesToUse: string[]) => {
-    const messages = [];
-    if (currentSession?.messages) {
-      for (const m of currentSession.messages) {
-        messages.push({
-          role: m.sender === "user" ? "user" : "assistant",
-          text: m.text,
-          images: m.images
-        });
+  const handleSendWithCommand = (rawText: string, commandToUse?: ClaudeCommand | null) => {
+    const cmd = commandToUse || activeCommand;
+    let textToSend = rawText.trim();
+
+    if (!textToSend && !pendingFiles.length) return;
+
+    // Check if rawText starts with a slash command like /godmode or /debug
+    if (textToSend.startsWith("/")) {
+      const firstToken = textToSend.split(/\s+/)[0];
+      const matchedCmd = CLAUDE_COMMANDS.find(c => c.command.toLowerCase() === firstToken.toLowerCase());
+      if (matchedCmd) {
+        const remaining = textToSend.slice(firstToken.length).trim();
+        textToSend = remaining ? `${matchedCmd.prompt} ${remaining}` : matchedCmd.prompt;
+      } else if (cmd) {
+        textToSend = `${cmd.prompt} ${textToSend}`;
       }
-    }
-    messages.push({
-      role: "user",
-      text: messageText,
-      images: imagesToUse.length > 0 ? imagesToUse : undefined
-    });
-
-    const effectiveSystemInstruction = `${systemInstruction}\n\nIMPORTANT: You must respond entirely in ${language === "ENG" ? "English" : "Hungarian"}.`;
-    
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "Qwen/Qwen3.5-35B-A3B:novita",
-        systemInstruction: effectiveSystemInstruction,
-        messages
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Failed to fetch from Qwen API");
+    } else if (cmd) {
+      textToSend = `${cmd.prompt} ${textToSend}`;
     }
 
-    let finalAiText = "";
-    const aiMessageId = crypto.randomUUID();
-
-    if (isStreaming && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunkStr = decoder.decode(value, { stream: true });
-          const lines = chunkStr.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.text) {
-                  finalAiText += data.text;
-                  setSessions(prev => prev.map(s => {
-                    if (s.id === currentSessionId) {
-                      const lastMsg = s.messages[s.messages.length - 1];
-                      if (lastMsg && lastMsg.id === aiMessageId) {
-                        return { ...s, messages: s.messages.slice(0, -1).concat({ ...lastMsg, text: finalAiText }) };
-                      } else {
-                        return { ...s, messages: [...s.messages, { id: aiMessageId, text: finalAiText, sender: "gemini", timestamp: Date.now() }] };
-                      }
-                    }
-                    return s;
-                  }));
-                }
-              } catch (e) {
-                // Ignore parse errors for incomplete chunks
-              }
-            }
-          }
-        }
-      }
-    } else {
-      // Fallback if not streaming or body missing
-      const data = await response.json();
-      finalAiText = data.text || "";
-      const aiMessage: Message = {
-        id: crypto.randomUUID(),
-        text: finalAiText || "No response.",
-        sender: "gemini",
-        timestamp: Date.now(),
-      };
-      setSessions(prev => prev.map(s => 
-        s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
-      ));
-    }
-
-    if (finalAiText) {
-      generateSuggestions(finalAiText);
-    }
+    setActiveCommand(null);
+    setShowCommandMenu(false);
+    sendMessage(textToSend);
   };
 
   const sendMessage = async (messageText: string, overrideImages?: string[]) => {
-    if (!messageText.trim() && !pendingImages.length && !overrideImages?.length) return;
+    if (!messageText.trim() && !pendingFiles.length && !overrideImages?.length) return;
     if (!currentSessionId) return;
 
     setSuggestedPrompts([]); // Clear old suggestions
 
-    const imagesToUse = overrideImages || pendingImages;
+    const imagesToUse = overrideImages || pendingFiles;
     const userMessage: Message = {
       id: crypto.randomUUID(),
       text: messageText,
@@ -546,26 +581,28 @@ export default function Chat() {
     }));
 
     setInput("");
-    setPendingImages([]);
+    setPendingFiles([]);
     setLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      
       // Handle Image Generation Model
-      if (selectedModel === "gemini-2.5-flash-image") {
-        const response = await ai.models.generateContent({
-          model: selectedModel,
-          contents: { parts: [{ text: messageText }] },
-          config: { imageConfig: { aspectRatio: "1:1" } }
+      if (selectedModel.includes("image")) {
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: messageText,
+            aspectRatio: "1:1"
+          })
         });
 
-        let generatedImageUrl = "";
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            generatedImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-          }
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || errData.error || "Failed to generate image.");
         }
+
+        const data = await response.json();
+        const generatedImageUrl = data.imageUrl || "";
 
         const aiMessage: Message = {
           id: crypto.randomUUID(),
@@ -580,86 +617,90 @@ export default function Chat() {
           s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
         ));
       } 
-      // Handle Qwen via HuggingFace Router
-      else if (selectedModel === "Qwen/Qwen3.5-35B-A3B:novita") {
-        await callQwenModel(messageText, imagesToUse);
-      }
-      // Handle Chat Models
+      // Handle Chat Models (Gemini or Qwen)
       else {
-        const parts: any[] = [];
-        if (messageText.trim()) {
-          parts.push({ text: messageText });
-        }
-        imagesToUse.forEach(img => {
-          const base64Data = img.split(',')[1];
-          const mimeType = img.split(';')[0].split(':')[1];
-          parts.push({ inlineData: { data: base64Data, mimeType } });
-        });
-
-        const validHistory: any[] = [];
-        let expectedRole = "user";
-        
+        const messagesPayload: any[] = [];
         if (currentSession?.messages) {
           for (const m of currentSession.messages) {
-            const role = m.sender === "user" ? "user" : "model";
-            if (role === expectedRole) {
-              validHistory.push({
-                role,
-                parts: [{ text: m.text?.trim() ? m.text : " " }]
-              });
-              expectedRole = role === "user" ? "model" : "user";
-            }
+            messagesPayload.push({
+              role: m.sender === "user" ? "user" : "gemini",
+              text: m.text,
+              images: m.images
+            });
           }
         }
-        
-        if (validHistory.length > 0 && validHistory[validHistory.length - 1].role === "user") {
-          validHistory.pop();
-        }
+        messagesPayload.push({
+          role: "user",
+          text: messageText,
+          images: imagesToUse.length > 0 ? imagesToUse : undefined
+        });
 
         const effectiveSystemInstruction = `${systemInstruction}\n\nIMPORTANT: You must respond entirely in ${language === "ENG" ? "English" : "Hungarian"}.`;
 
-        const chat = ai.chats.create({
-          model: selectedModel,
-          config: { 
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: selectedModel,
             systemInstruction: effectiveSystemInstruction,
-            tools: activeAgent.geminiTools
-          },
-          history: validHistory.length > 0 ? validHistory : undefined
+            messages: messagesPayload,
+            stream: isStreaming
+          })
         });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.message || errData.error || `Request failed with status ${response.status}`;
+          throw new Error(errMsg);
+        }
 
         let finalAiText = "";
         let finalGroundingChunks: any[] = [];
+        const aiMessageId = crypto.randomUUID();
 
-        if (isStreaming) {
-          const response = await chat.sendMessageStream({ message: parts });
-          const aiMessageId = crypto.randomUUID();
+        if (isStreaming && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let done = false;
 
-          for await (const chunk of response) {
-            const c = chunk as GenerateContentResponse;
-            finalAiText += c.text;
-            
-            if (c.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-              finalGroundingChunks = c.candidates[0].groundingMetadata.groundingChunks;
-            }
-
-            setSessions(prev => prev.map(s => {
-              if (s.id === currentSessionId) {
-                const lastMsg = s.messages[s.messages.length - 1];
-                if (lastMsg && lastMsg.id === aiMessageId) {
-                  return { ...s, messages: s.messages.slice(0, -1).concat({ ...lastMsg, text: finalAiText, groundingChunks: finalGroundingChunks }) };
-                } else {
-                  return { ...s, messages: [...s.messages, { id: aiMessageId, text: finalAiText, sender: "gemini", timestamp: Date.now(), groundingChunks: finalGroundingChunks }] };
+          while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+            if (value) {
+              const chunkStr = decoder.decode(value, { stream: true });
+              const lines = chunkStr.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.text) {
+                      finalAiText += data.text;
+                    }
+                    if (data.groundingChunks) {
+                      finalGroundingChunks = data.groundingChunks;
+                    }
+                    setSessions(prev => prev.map(s => {
+                      if (s.id === currentSessionId) {
+                        const lastMsg = s.messages[s.messages.length - 1];
+                        if (lastMsg && lastMsg.id === aiMessageId) {
+                          return { ...s, messages: s.messages.slice(0, -1).concat({ ...lastMsg, text: finalAiText, groundingChunks: finalGroundingChunks }) };
+                        } else {
+                          return { ...s, messages: [...s.messages, { id: aiMessageId, text: finalAiText, sender: "gemini", timestamp: Date.now(), groundingChunks: finalGroundingChunks }] };
+                        }
+                      }
+                      return s;
+                    }));
+                  } catch (e) {
+                    // Ignore parse errors for split chunk frames
+                  }
                 }
               }
-              return s;
-            }));
+            }
           }
         } else {
-          const response = await chat.sendMessage({ message: parts });
-          finalAiText = response.text || "";
-          if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-            finalGroundingChunks = response.candidates[0].groundingMetadata.groundingChunks;
-          }
+          const data = await response.json();
+          finalAiText = data.text || "";
+          finalGroundingChunks = data.groundingChunks || [];
 
           const aiMessage: Message = {
             id: crypto.randomUUID(),
@@ -672,32 +713,20 @@ export default function Chat() {
             s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
           ));
         }
-        
-        // Generate suggestions after AI finishes
+
         if (finalAiText) {
           generateSuggestions(finalAiText);
         }
       }
-    } catch (error) {
-      console.error("Error:", error);
+    } catch (error: any) {
+      console.error("Chat Error:", error);
       
-      // Fallback to Qwen if Gemini fails
-      if (selectedModel !== "Qwen/Qwen3.5-35B-A3B:novita" && selectedModel !== "gemini-2.5-flash-image") {
-        try {
-          console.log("Gemini failed, falling back to Qwen...");
-          await callQwenModel(messageText, imagesToUse);
-          return; // Success
-        } catch (qwenError) {
-          console.error("Qwen fallback failed too:", qwenError);
-        }
-      }
+      let errorText = "Error: " + (error instanceof Error ? error.message : String(error));
       
-      let errorText = "Error: " + (error instanceof Error ? error.message : "Something went wrong.");
-      
-      if (errorText.includes("429") || errorText.includes("RESOURCE_EXHAUSTED")) {
-        errorText = "⚠️ **Quota Exceeded**: Your Gemini API key has reached its rate limit or quota. Please check your Google AI Studio billing details or try again later.";
-      } else if (errorText.includes("403") && errorText.includes("Inference Providers")) {
-        errorText = "⚠️ **Permission Denied**: Your Hugging Face token does not have the required permissions.\n\nTo fix this:\n1. Go to your Hugging Face Token Settings.\n2. Create a new **Fine-grained** token.\n3. Under 'Inference', check **Make calls to the Serverless Inference API**.\n4. Update the `HF_TOKEN` secret in AI Studio.";
+      if (errorText.includes("429") || errorText.includes("RESOURCE_EXHAUSTED") || errorText.includes("Quota Exceeded")) {
+        errorText = "⚠️ **Quota Limit Reached (429)**\n\nThe Gemini API quota for this billing tier has been reached. Please try again in a few moments, or check your rate limits in Google AI Studio.";
+      } else if (errorText.includes("401") || errorText.includes("Invalid username or password") || errorText.includes("HF_TOKEN")) {
+        errorText = "⚠️ **Hugging Face Authentication Failed (401)**\n\nTo use Qwen models, please ensure a valid Hugging Face User Access Token is configured in **Settings > Secrets** (`HF_TOKEN`), or switch to a Gemini model from the model selector above.";
       }
 
       const errorMessage: Message = {
@@ -757,6 +786,27 @@ export default function Chat() {
     reader.readAsText(file);
   };
 
+  const handleRetryWithGemini = (failedMessageId?: string) => {
+    setSelectedModel("gemini-3.7-flash");
+    const currentSess = sessions.find(s => s.id === currentSessionId);
+    if (!currentSess) return;
+
+    const userMsgs = currentSess.messages.filter(m => m.sender === "user");
+    const lastUserMsg = userMsgs[userMsgs.length - 1];
+
+    if (failedMessageId) {
+      setSessions(prev => prev.map(s => 
+        s.id === currentSessionId ? { ...s, messages: s.messages.filter(m => m.id !== failedMessageId) } : s
+      ));
+    }
+
+    if (lastUserMsg) {
+      setTimeout(() => {
+        sendMessage(lastUserMsg.text, lastUserMsg.images);
+      }, 50);
+    }
+  };
+
   const handleContinue = (messageText: string) => {
     sendMessage("Continue from here: " + messageText.slice(-100));
   };
@@ -791,18 +841,19 @@ export default function Chat() {
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.aside
-            initial={{ x: -300, opacity: 0 }}
+            initial={{ x: -320, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            className="fixed md:relative w-72 h-full bg-[#050505] border-r border-[#b020ff]/30 flex flex-col z-20 shadow-[0_0_15px_rgba(0,255,249,0.1)] md:shadow-none"
+            exit={{ x: -320, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed md:relative w-[85vw] max-w-[300px] md:w-72 h-full bg-[#07070d] border-r border-[#b020ff]/30 flex flex-col z-40 shadow-[0_0_30px_rgba(0,0,0,0.9)] md:shadow-none top-0 left-0"
           >
-            <div className="p-4 border-bottom border-[#b020ff]/30 flex items-center gap-2">
+            <div className="p-4 border-b border-[#b020ff]/30 flex items-center gap-2">
               <button
                 onClick={createNewChat}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#e028e0] hover:bg-[#e028e0]/80 text-white py-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(255,0,60,0.5)]"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#e028e0] hover:bg-[#e028e0]/80 text-white py-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(255,0,60,0.5)] font-bold text-xs"
               >
-                <Plus size={18} />
-                <span className="font-medium">{t.newChat}</span>
+                <Plus size={16} />
+                <span>{t.newChat}</span>
               </button>
               <button
                 onClick={(e) => {
@@ -814,37 +865,90 @@ export default function Chat() {
                 className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"
                 title="Delete Current Chat"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
               </button>
               <button
                 onClick={() => setIsSidebarOpen(false)}
-                className="p-2.5 bg-[#ffc020]/10 hover:bg-[#ffc020]/20 text-[#ffc020] rounded-xl transition-all md:hidden"
+                className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all md:hidden"
                 title="Close Sidebar"
               >
-                <Menu size={18} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
-              {suggestedPrompts.length > 0 && (
-                <div className="mb-4 px-2">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-[#ffc020] uppercase tracking-widest mb-2">
-                    <Sparkles size={10} />
-                    Suggested Replies
+            <div className="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-hide">
+              {/* Dynamic Suggested Prompts in Menu */}
+              <div className="mb-3 px-2 py-2.5 rounded-xl bg-gradient-to-b from-[#ffc020]/10 via-[#ffc020]/5 to-transparent border border-[#ffc020]/30 shadow-[0_0_12px_rgba(255,192,32,0.1)]">
+                <div className="flex items-center justify-between text-[10px] font-bold text-[#ffc020] uppercase tracking-wider mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles size={12} className={isGeneratingSuggestions ? "animate-spin text-[#ffc020]" : "text-[#ffc020] animate-pulse"} />
+                    <span>{t.dynamicPrompts}</span>
+                    {suggestedPrompts.length > 0 && (
+                      <span className="bg-[#ffc020]/20 text-[#ffc020] text-[9px] px-1.5 py-0.2 rounded-full font-mono">
+                        {suggestedPrompts.length}
+                      </span>
+                    )}
                   </div>
-                  <div className="space-y-2">
+                  {currentSession && currentSession.messages.some(m => m.sender === "gemini") && (
+                    <button
+                      onClick={() => {
+                        const aiMsgs = currentSession.messages.filter(m => m.sender === "gemini");
+                        const lastAi = aiMsgs[aiMsgs.length - 1];
+                        if (lastAi) generateSuggestions(lastAi.text, lastAi.id);
+                      }}
+                      disabled={isGeneratingSuggestions || loading}
+                      className="p-1 hover:bg-[#ffc020]/20 text-[#ffc020]/80 hover:text-[#ffc020] rounded transition-colors"
+                      title={t.regenerate}
+                    >
+                      <RefreshCw size={11} className={isGeneratingSuggestions ? "animate-spin" : ""} />
+                    </button>
+                  )}
+                </div>
+
+                {isGeneratingSuggestions ? (
+                  <div className="p-3 rounded-lg bg-[#000]/40 border border-[#ffc020]/20 flex items-center justify-center gap-2 text-xs text-[#ffc020]/90 animate-pulse">
+                    <Loader2 size={13} className="animate-spin text-[#ffc020]" />
+                    <span>{t.generatingPrompts}</span>
+                  </div>
+                ) : suggestedPrompts.length > 0 ? (
+                  <div className="space-y-1.5">
                     {suggestedPrompts.map((prompt, i) => (
                       <button
                         key={i}
-                        onClick={() => sendMessage(prompt)}
-                        className="w-full text-left p-2.5 rounded-xl bg-[#ffc020]/5 border border-[#ffc020]/20 hover:bg-[#ffc020]/10 hover:border-[#ffc020]/40 text-[11px] text-[#ffc020]/80 transition-all leading-snug"
+                        onClick={() => {
+                          sendMessage(prompt);
+                          if (window.innerWidth < 768) setIsSidebarOpen(false);
+                        }}
+                        className="w-full text-left p-2 rounded-lg bg-[#0a0a10] border border-[#ffc020]/25 hover:border-[#ffc020]/70 hover:bg-[#ffc020]/15 text-[11px] text-[#ffc020] hover:text-white transition-all leading-snug flex items-center justify-between group shadow-sm"
                       >
-                        {prompt}
+                        <span className="line-clamp-2 pr-1">{prompt}</span>
+                        <ArrowRight size={11} className="text-[#ffc020]/40 group-hover:text-[#ffc020] group-hover:translate-x-0.5 transition-all shrink-0" />
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div>
+                    {currentSession && currentSession.messages.some(m => m.sender === "gemini") ? (
+                      <button
+                        onClick={() => {
+                          const aiMsgs = currentSession.messages.filter(m => m.sender === "gemini");
+                          const lastAi = aiMsgs[aiMsgs.length - 1];
+                          if (lastAi) generateSuggestions(lastAi.text, lastAi.id);
+                        }}
+                        disabled={loading}
+                        className="w-full text-center py-2 px-2.5 rounded-lg bg-[#ffc020]/10 hover:bg-[#ffc020]/20 border border-[#ffc020]/30 text-[11px] font-semibold text-[#ffc020] transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Sparkles size={11} />
+                        <span>{t.generatePrompts}</span>
+                      </button>
+                    ) : (
+                      <div className="text-[10px] text-white/40 italic text-center py-1">
+                        {language === "HUN" ? "A válasz után itt jelennek meg a folytatási javaslatok." : "Suggested prompts will appear here after AI replies."}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center justify-between text-[10px] font-bold text-[#a0a0b0]/60 uppercase tracking-widest px-2 mb-2">
                 <span>Recent Chats</span>
@@ -852,53 +956,104 @@ export default function Chat() {
               {sessions.map(session => (
                 <div
                   key={session.id}
-                  onClick={() => setCurrentSessionId(session.id)}
+                  onClick={() => {
+                    setCurrentSessionId(session.id);
+                    if (window.innerWidth < 768) setIsSidebarOpen(false);
+                  }}
                   className={cn(
                     "group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all",
                     currentSessionId === session.id 
-                      ? "bg-[#0a0a0a] text-[#20e0e0]" 
+                      ? "bg-[#0a0a0a] text-[#20e0e0] border border-[#20e0e0]/30" 
                       : "hover:bg-[#0a0a0a]/50 text-[#20e0e0]/60"
                   )}
                 >
-                  <MessageSquare size={18} />
-                  <span className="flex-1 truncate text-sm font-medium">{session.title}</span>
+                  <MessageSquare size={16} />
+                  <span className="flex-1 truncate text-xs font-medium">{session.title}</span>
                   <button
                     onClick={(e) => deleteSession(session.id, e)}
                     className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               ))}
             </div>
 
-            <div className="p-4 border-t border-[#b020ff]/30 space-y-4">
+            <div className="p-4 border-t border-[#b020ff]/30 space-y-2.5">
+              {/* Claude Commands Button */}
               <button
                 onClick={() => {
-                  const generator = AGENT_LIBRARY.find(a => a.id === "agent-generator");
-                  if (generator) selectAgent(generator);
+                  setIsClaudeModalOpen(true);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
-                className="w-full flex items-center gap-3 p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#20e0e0]/30"
+                className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-[#b020ff]/20 to-[#4060ff]/20 hover:from-[#b020ff]/30 hover:to-[#4060ff]/30 rounded-xl text-sm text-white transition-all border border-[#b020ff]/50 shadow-[0_0_15px_rgba(176,32,255,0.15)] group"
               >
-                <div className="p-2 bg-[#20e0e0]/10 rounded-lg text-[#20e0e0]">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-[#b020ff]/20 rounded-lg text-[#b020ff] group-hover:scale-105 transition-transform">
+                    <Zap size={16} />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="font-bold text-xs text-white">{t.claudeCommandsBtn}</span>
+                    <span className="text-[10px] text-[#20e0e0]/70">{t.openPlaybook}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono font-bold bg-[#b020ff]/30 text-[#20e0e0] px-2 py-0.5 rounded-full border border-[#b020ff]/40">
+                  43
+                </span>
+              </button>
+
+              {/* Plugins Console Button */}
+              <button
+                onClick={() => {
+                  setIsPluginModalOpen(true);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#80ff00]/40 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-[#80ff00]/10 rounded-lg text-[#80ff00] group-hover:scale-105 transition-transform">
+                    <Sliders size={16} />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="font-bold text-xs text-white">{t.pluginsBtn}</span>
+                    <span className="text-[10px] text-[#80ff00]/70">Sandbox & Tools</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono font-bold bg-[#80ff00]/20 text-[#80ff00] px-2 py-0.5 rounded-full border border-[#80ff00]/30">
+                  {plugins.filter(p => p.enabled).length} ON
+                </span>
+              </button>
+
+              {/* Agent Generator / Creator Modal Launcher */}
+              <button
+                onClick={() => {
+                  setIsAgentCreatorOpen(true);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-3 p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#20e0e0]/40 hover:border-[#20e0e0] group"
+              >
+                <div className="p-2 bg-[#20e0e0]/10 rounded-lg text-[#20e0e0] group-hover:scale-105 transition-transform">
                   <Cpu size={16} />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-bold">{t.agentGenerator}</span>
+                  <span className="font-bold text-xs">{t.agentGenerator}</span>
                   <span className="text-[10px] text-[#a0a0b0]/60">{t.createCustomAgents}</span>
                 </div>
               </button>
 
               <button
-                onClick={() => setIsLibraryOpen(true)}
-                className="w-full flex items-center gap-3 p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#e028e0]/30"
+                onClick={() => {
+                  setIsLibraryOpen(true);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-3 p-3 bg-[#0a0a0a] hover:bg-[#111] rounded-xl text-sm text-white transition-all border border-[#b020ff]/30 group"
               >
-                <div className="p-2 bg-[#ffc020]/10 rounded-lg text-[#ffc020]">
-                  <Terminal size={16} />
+                <div className="p-2 bg-[#b020ff]/10 rounded-lg text-[#b020ff] group-hover:scale-105 transition-transform">
+                  <Sparkles size={16} />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-bold">{t.agentLibrary}</span>
-                  <span className="text-[10px] text-[#a0a0b0]/60">{t.skillsAndAgents}</span>
+                  <span className="font-bold text-xs">{t.agentLibrary}</span>
+                  <span className="text-[10px] text-[#a0a0b0]/60">{allAgents.length} Agents</span>
                 </div>
               </button>
 
@@ -907,20 +1062,20 @@ export default function Chat() {
                 <textarea 
                   value={systemInstruction}
                   onChange={(e) => setSystemInstruction(e.target.value)}
-                  className="w-full bg-[#0a0a0a] text-xs rounded-lg p-2 border border-[#e028e0]/30 focus:border-[#20e0e0] outline-none resize-none h-20"
+                  className="w-full bg-[#0a0a0a] text-xs rounded-lg p-2 border border-[#e028e0]/30 focus:border-[#20e0e0] outline-none resize-none h-16"
                   placeholder={t.setPersona}
                 />
               </div>
               
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs text-[#80ff00]/60 px-2 mb-2">
-                  <span>DATA MANAGEMENT</span>
+                <div className="flex items-center justify-between text-xs text-[#80ff00]/60 px-2 mb-1">
+                  <span className="text-[10px] font-mono">DATA</span>
                 </div>
-                <button onClick={exportJSON} className="w-full flex items-center gap-3 p-2 text-sm text-[#80ff00]/80 hover:text-white transition-colors">
-                  <Download size={16} /> Export History
+                <button onClick={exportJSON} className="w-full flex items-center gap-3 p-2 text-xs text-[#80ff00]/80 hover:text-white transition-colors">
+                  <Download size={14} /> Export JSON
                 </button>
-                <label className="w-full flex items-center gap-3 p-2 text-sm text-[#80ff00]/80 hover:text-white transition-colors cursor-pointer">
-                  <Upload size={16} /> Import History
+                <label className="w-full flex items-center gap-3 p-2 text-xs text-[#80ff00]/80 hover:text-white transition-colors cursor-pointer">
+                  <Upload size={14} /> Import JSON
                   <input type="file" hidden onChange={importJSON} accept=".json" />
                 </label>
               </div>
@@ -930,35 +1085,65 @@ export default function Chat() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 relative">
+      <main className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden bg-black">
         {/* Header */}
-        <header className="h-16 bg-black/80 backdrop-blur-md border-b border-[#e028e0]/30 flex items-center justify-between px-4 z-10">
-          <div className="flex items-center gap-3">
+        <header className="h-14 sm:h-16 bg-black/90 backdrop-blur-md border-b border-[#e028e0]/30 flex items-center justify-between px-3 sm:px-4 z-10">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-[#111] rounded-lg text-[#ffc020] transition-colors"
+              className="p-2 hover:bg-[#111] rounded-lg text-[#ffc020] transition-colors shrink-0"
+              title="Toggle Menu"
             >
-              <Menu size={20} />
+              <Menu size={18} />
             </button>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <h1 
-                className="text-lg font-bold text-white leading-tight glitch-text"
-                data-text={currentSession?.title || "GlitchedAI"}
+                className="text-sm sm:text-base font-bold text-white leading-tight truncate glitch-text"
+                data-text={currentSession?.title || "AgentKlein AI"}
               >
-                {currentSession?.title || "GlitchedAI"}
+                {currentSession?.title || "AgentKlein AI"}
               </h1>
-              <div className="flex items-center gap-1.5 text-[10px] cyber-text font-mono uppercase tracking-wider">
-                <Sparkles size={10} />
-                {MODELS.find(m => m.id === selectedModel)?.name}
+              <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] cyber-text font-mono uppercase tracking-wider truncate">
+                <Sparkles size={9} />
+                <span className="truncate">{MODELS.find(m => m.id === selectedModel)?.name}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Quick Generator Button */}
+            <button
+              onClick={() => setIsAgentCreatorOpen(true)}
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-[#20e0e0]/20 hover:bg-[#20e0e0]/30 text-[#20e0e0] rounded-lg border border-[#20e0e0]/40 text-xs font-bold transition-all shadow-[0_0_10px_rgba(32,224,224,0.2)]"
+              title="Open Agent Skill Generator Studio"
+            >
+              <Cpu size={13} />
+              <span className="hidden xs:inline sm:inline">Generator</span>
+            </button>
+
+            <button
+              onClick={() => setIsClaudeModalOpen(true)}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-[#b020ff]/20 hover:bg-[#b020ff]/30 text-[#20e0e0] rounded-lg border border-[#b020ff]/50 text-xs font-bold transition-all shadow-[0_0_10px_rgba(176,32,255,0.2)]"
+              title="Open all 43 Claude Commands playbook"
+            >
+              <Zap size={13} className="text-[#b020ff]" />
+              <span className="hidden xs:inline sm:inline">/commands</span>
+              <span className="bg-[#b020ff]/40 text-white text-[9px] px-1 rounded">43</span>
+            </button>
+
+            <button
+              onClick={() => setIsPluginModalOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#80ff00]/10 hover:bg-[#80ff00]/20 text-[#80ff00] rounded-lg border border-[#80ff00]/30 text-xs font-bold transition-all"
+              title="Open Terminal Plugins & Code Sandbox"
+            >
+              <Sliders size={13} />
+              <span>Plugins</span>
+            </button>
+
             <select 
               value={language}
               onChange={(e) => setLanguage(e.target.value as "ENG" | "HUN")}
-              className="bg-[#0a0a0a] text-xs border border-[#20e0e0]/30 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-[#20e0e0] outline-none cyber-text mr-2"
+              className="bg-[#0a0a0a] text-[11px] sm:text-xs border border-[#20e0e0]/30 rounded-lg px-2 py-1 focus:ring-1 focus:ring-[#20e0e0] outline-none cyber-text"
             >
               <option value="ENG">ENG</option>
               <option value="HUN">HUN</option>
@@ -966,7 +1151,7 @@ export default function Chat() {
             <select 
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-[#0a0a0a] text-xs border border-[#20e0e0]/30 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-[#20e0e0] outline-none cyber-text"
+              className="bg-[#0a0a0a] text-[11px] sm:text-xs border border-[#20e0e0]/30 rounded-lg px-2 py-1 focus:ring-1 focus:ring-[#20e0e0] outline-none cyber-text max-w-[120px] sm:max-w-none truncate"
             >
               {MODELS.map(m => (
                 <option key={m.id} value={m.id}>{m.name}</option>
@@ -974,10 +1159,10 @@ export default function Chat() {
             </select>
             <button 
               onClick={exportToPDF}
-              className="p-2 hover:bg-[#111] rounded-lg text-[#a0a0b0]/80 transition-colors"
+              className="p-1.5 sm:p-2 hover:bg-[#111] rounded-lg text-[#a0a0b0]/80 transition-colors"
               title={t.exportPDF}
             >
-              <FileText size={20} />
+              <FileText size={18} />
             </button>
           </div>
         </header>
@@ -1118,31 +1303,136 @@ export default function Chat() {
 
                 {/* AI Message Actions (End of Answer) */}
                 {message.sender === "gemini" && (
-                  <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[#20e0e0]/10">
-                    <button 
-                      onClick={() => handleCopy(message.text, message.id)}
-                      className="flex items-center gap-1.5 text-xs text-[#20e0e0]/60 hover:text-[#20e0e0] transition-colors"
-                      title="Copy Answer"
-                    >
-                      {copiedMessageId === message.id ? <Check size={14} /> : <Copy size={14} />}
-                      <span>Copy</span>
-                    </button>
-                    <button 
-                      onClick={() => handleStartNewChatWithAnswer(message.text)}
-                      className="flex items-center gap-1.5 text-xs text-[#20e0e0]/60 hover:text-[#20e0e0] transition-colors"
-                      title="Start new chat with this answer as system prompt"
-                    >
-                      <MessageSquare size={14} />
-                      <span>Chat</span>
-                    </button>
-                    <button 
-                      onClick={() => handleContinue(message.text)}
-                      className="flex items-center gap-1.5 text-xs text-[#20e0e0]/60 hover:text-[#20e0e0] transition-colors"
-                      title="Continue"
-                    >
-                      <CornerDownLeft size={14} />
-                      <span>Continue</span>
-                    </button>
+                  <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-[#20e0e0]/10">
+                    {/* Error Recovery Button */}
+                    {(message.text.includes("⚠️") || message.text.includes("Error:") || message.text.includes("401") || message.text.includes("429")) && (
+                      <div className="mb-2">
+                        <button
+                          onClick={() => handleRetryWithGemini(message.id)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-[#20e0e0]/20 hover:bg-[#20e0e0]/30 text-[#20e0e0] border border-[#20e0e0]/50 rounded-lg text-xs font-semibold transition-all shadow-sm"
+                        >
+                          <RefreshCw size={13} />
+                          <span>Switch to Gemini 3.7 Flash & Retry</span>
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button 
+                        onClick={() => handleCopy(message.text, message.id)}
+                        className="flex items-center gap-1.5 text-xs text-[#20e0e0]/70 hover:text-[#20e0e0] transition-colors bg-[#111] px-2.5 py-1 rounded-lg border border-[#20e0e0]/20"
+                        title="Copy Answer"
+                      >
+                        {copiedMessageId === message.id ? <Check size={13} /> : <Copy size={13} />}
+                        <span>Copy</span>
+                      </button>
+
+                      <button 
+                        onClick={() => handleToggleTTS(message.id, message.text)}
+                        className={cn(
+                          "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all",
+                          speakingMessageId === message.id
+                            ? "bg-[#80ff00]/20 text-[#80ff00] border-[#80ff00]/50 animate-pulse"
+                            : "text-[#80ff00]/70 hover:text-[#80ff00] bg-[#111] border-[#80ff00]/20"
+                        )}
+                        title="Text-to-Speech Voice Playback"
+                      >
+                        {speakingMessageId === message.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                        <span>{speakingMessageId === message.id ? t.stop : t.listen}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => handleStartNewChatWithAnswer(message.text)}
+                        className="flex items-center gap-1.5 text-xs text-[#ffc020]/70 hover:text-[#ffc020] bg-[#111] px-2.5 py-1 rounded-lg border border-[#ffc020]/20 transition-colors"
+                        title="Start new chat with this answer as system prompt"
+                      >
+                        <MessageSquare size={13} />
+                        <span>Fork Chat</span>
+                      </button>
+
+                      <button 
+                        onClick={() => handleContinue(message.text)}
+                        className="flex items-center gap-1.5 text-xs text-[#4060ff]/70 hover:text-[#4060ff] bg-[#111] px-2.5 py-1 rounded-lg border border-[#4060ff]/20 transition-colors"
+                        title="Continue"
+                      >
+                        <CornerDownLeft size={13} />
+                        <span>Continue</span>
+                      </button>
+
+                      <button 
+                        onClick={() => generateSuggestions(message.text, message.id)}
+                        disabled={isGeneratingSuggestions || loading}
+                        className="flex items-center gap-1.5 text-xs text-[#ffc020] hover:text-white bg-[#ffc020]/10 hover:bg-[#ffc020]/25 px-2.5 py-1 rounded-lg border border-[#ffc020]/30 transition-all shadow-sm"
+                        title="Generate dynamic follow-up prompts"
+                      >
+                        <Sparkles size={13} className={isGeneratingSuggestions ? "animate-spin" : ""} />
+                        <span>{t.dynamicPrompts}</span>
+                      </button>
+                    </div>
+
+                    {/* Dynamic Follow-up Prompt Cards inside AI message bubble */}
+                    {((message.suggestions && message.suggestions.length > 0) || (currentSession?.messages[currentSession.messages.length - 1]?.id === message.id && suggestedPrompts.length > 0)) && (
+                      <div className="mt-2 pt-2.5 border-t border-[#ffc020]/20 bg-gradient-to-r from-[#ffc020]/10 via-[#ffc020]/5 to-transparent rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#ffc020] uppercase tracking-wider">
+                            <Sparkles size={12} className="text-[#ffc020] animate-pulse" />
+                            <span>{t.suggestedFollowUps}</span>
+                          </div>
+                          <span className="text-[10px] text-[#ffc020]/60 font-mono">1-click prompt</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {((message.suggestions && message.suggestions.length > 0) ? message.suggestions : suggestedPrompts).map((prompt, pIdx) => (
+                            <button
+                              key={pIdx}
+                              onClick={() => sendMessage(prompt)}
+                              className="text-left p-2.5 rounded-lg bg-[#0a0a10]/90 hover:bg-[#ffc020]/20 border border-[#ffc020]/30 hover:border-[#ffc020]/70 text-xs text-white/90 hover:text-[#ffc020] transition-all flex items-center justify-between group shadow-sm"
+                            >
+                              <span className="line-clamp-2 pr-1.5 leading-snug">{prompt}</span>
+                              <ArrowRight size={12} className="text-[#ffc020]/50 group-hover:text-[#ffc020] group-hover:translate-x-1 transition-all shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quick Command Transform Chips */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 pt-2 border-t border-white/5">
+                      <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest mr-1">Transforms:</span>
+                      <button
+                        onClick={() => handleTransformMessage("/explainlikeim5", message.text)}
+                        className="text-[10px] font-mono bg-[#050505] hover:bg-[#b020ff]/20 text-[#b020ff] hover:text-white px-2 py-0.5 rounded border border-[#b020ff]/30 transition-colors"
+                        title="Explain like I'm 5"
+                      >
+                        🧒 /explainlikeim5
+                      </button>
+                      <button
+                        onClick={() => handleTransformMessage("/10x", message.text)}
+                        className="text-[10px] font-mono bg-[#050505] hover:bg-[#20e0e0]/20 text-[#20e0e0] hover:text-white px-2 py-0.5 rounded border border-[#20e0e0]/30 transition-colors"
+                        title="Multiply quality by 10x"
+                      >
+                        ⚡ /10x
+                      </button>
+                      <button
+                        onClick={() => handleTransformMessage("/debug", message.text)}
+                        className="text-[10px] font-mono bg-[#050505] hover:bg-[#80ff00]/20 text-[#80ff00] hover:text-white px-2 py-0.5 rounded border border-[#80ff00]/30 transition-colors"
+                        title="Deep code debugging"
+                      >
+                        🐞 /debug
+                      </button>
+                      <button
+                        onClick={() => handleTransformMessage("/critique", message.text)}
+                        className="text-[10px] font-mono bg-[#050505] hover:bg-[#ffc020]/20 text-[#ffc020] hover:text-white px-2 py-0.5 rounded border border-[#ffc020]/30 transition-colors"
+                        title="Brutally honest review"
+                      >
+                        🔍 /critique
+                      </button>
+                      <button
+                        onClick={() => handleTransformMessage("/summary", message.text)}
+                        className="text-[10px] font-mono bg-[#050505] hover:bg-[#4060ff]/20 text-[#4060ff] hover:text-white px-2 py-0.5 rounded border border-[#4060ff]/30 transition-colors"
+                        title="Executive Summary"
+                      >
+                        📋 /summary
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1153,7 +1443,7 @@ export default function Chat() {
           ))}
           {loading && (
             <div className="flex items-start gap-3">
-              <div className="bg-[#0a0a0a] p-4 rounded-2xl rounded-tl-none border border-[#e028e0]/30 flex items-center gap-3">
+              <div className="bg-[#0a0a0a] p-4 rounded-2xl rounded-tl-none border border-[#e028e0]/30 flex items-center gap-3 shadow-[0_0_15px_rgba(224,40,224,0.2)]">
                 <Loader2 className="animate-spin text-[#20e0e0]" size={18} />
                 <span className="text-sm text-[#e028e0]/80 animate-pulse">{t.geminiProcessing}</span>
               </div>
@@ -1163,16 +1453,115 @@ export default function Chat() {
         </div>
 
         {/* Input Area */}
-        <footer className="p-4 bg-[#050505]/50 backdrop-blur-md border-t border-[#20e0e0]/30">
-          <div className="max-w-4xl mx-auto space-y-4">
+        <footer className="p-4 bg-[#050505]/70 backdrop-blur-md border-t border-[#20e0e0]/30 relative z-20">
+          <div className="max-w-4xl mx-auto space-y-3">
+            {/* Armed Active Command Badge */}
+            {activeCommand && (
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-[#b020ff]/30 via-[#4060ff]/20 to-transparent border border-[#b020ff]/60 rounded-xl shadow-[0_0_15px_rgba(176,32,255,0.25)]"
+              >
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="w-2 h-2 rounded-full bg-[#80ff00] animate-ping" />
+                  <Zap size={14} className="text-[#20e0e0]" />
+                  <span className="font-mono font-bold text-white bg-[#b020ff]/50 px-2 py-0.5 rounded text-xs border border-[#b020ff]/60">
+                    {activeCommand.command}
+                  </span>
+                  <span className="font-semibold text-[#20e0e0]">{activeCommand.name}</span>
+                  <span className="text-[11px] text-[#a0a0b0] hidden sm:inline">- {activeCommand.description}</span>
+                </div>
+                <button
+                  onClick={() => setActiveCommand(null)}
+                  className="p-1 hover:bg-[#b020ff]/30 rounded-lg text-white/70 hover:text-white transition-colors"
+                  title="Clear Active Command"
+                >
+                  <X size={14} />
+                </button>
+              </motion.div>
+            )}
+
+            {/* Dynamic Suggested Prompts Carousel Above Input */}
+            {suggestedPrompts.length > 0 && !loading && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                <span className="text-[10px] font-mono font-bold text-[#ffc020] uppercase whitespace-nowrap tracking-wider flex items-center gap-1 bg-[#ffc020]/15 px-2 py-0.5 rounded border border-[#ffc020]/40">
+                  <Sparkles size={11} className="text-[#ffc020] animate-pulse" />
+                  {t.dynamicPrompts}:
+                </span>
+                {suggestedPrompts.map((prompt, pIdx) => (
+                  <button
+                    key={pIdx}
+                    onClick={() => sendMessage(prompt)}
+                    className="text-xs bg-[#0c0c14] hover:bg-[#ffc020]/20 text-[#ffc020] hover:text-white px-2.5 py-1 rounded-lg border border-[#ffc020]/40 hover:border-[#ffc020]/80 transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 shadow-sm"
+                  >
+                    <span className="font-medium">{prompt}</span>
+                    <ArrowRight size={11} className="opacity-70 text-[#ffc020]" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Quick Popular Commands Carousel */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[10px] font-mono font-bold text-[#20e0e0]/60 uppercase whitespace-nowrap tracking-wider flex items-center gap-1">
+                <Zap size={11} className="text-[#ffc020]" />
+                {t.quickCommandsTitle}
+              </span>
+              
+              {[
+                { cmd: "/godmode", label: "God Mode", icon: "⚡" },
+                { cmd: "/10x", label: "10x Quality", icon: "🚀" },
+                { cmd: "/debug", label: "Deep Debug", icon: "🐞" },
+                { cmd: "/explainlikeim5", label: "ELI5", icon: "🧒" },
+                { cmd: "/critique", label: "Critique", icon: "🔍" },
+                { cmd: "/architect", label: "Architect", icon: "🏗️" },
+                { cmd: "/plan", label: "Plan", icon: "🎯" },
+                { cmd: "/security", label: "Security", icon: "🔒" },
+                { cmd: "/pitch", label: "Pitch", icon: "💼" },
+                { cmd: "/brief", label: "Exec Brief", icon: "📊" },
+              ].map(c => {
+                const fullCmd = CLAUDE_COMMANDS.find(item => item.command === c.cmd);
+                return (
+                  <button
+                    key={c.cmd}
+                    onClick={() => {
+                      if (fullCmd) handleSelectClaudeCommand(fullCmd);
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all flex items-center gap-1 border",
+                      activeCommand?.command === c.cmd
+                        ? "bg-[#b020ff] text-white border-[#b020ff] shadow-[0_0_10px_rgba(176,32,255,0.4)]"
+                        : "bg-[#0a0a0a] hover:bg-[#111] text-[#20e0e0]/80 hover:text-white border-[#20e0e0]/20 hover:border-[#20e0e0]/50"
+                    )}
+                  >
+                    <span>{c.icon}</span>
+                    <span className="font-bold">{c.cmd}</span>
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => setIsClaudeModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-[#b020ff]/20 hover:bg-[#b020ff]/30 text-[#b020ff] hover:text-white border border-[#b020ff]/40 whitespace-nowrap transition-all flex items-center gap-1"
+              >
+                <span>+ 33 More...</span>
+              </button>
+            </div>
+
             {/* Pending Images Preview */}
-            {pendingImages.length > 0 && (
+            {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 pb-2">
-                {pendingImages.map((img, i) => (
+                {pendingFiles.map((fileContent, i) => (
                   <div key={i} className="relative group">
-                    <img src={img} className="w-16 h-16 object-cover rounded-lg border border-[#e028e0]/30" />
+                    {fileContent.startsWith('data:image/') ? (
+                      <img src={fileContent} className="w-16 h-16 object-cover rounded-lg border border-[#e028e0]/30" />
+                    ) : (
+                      <div className="w-16 h-16 flex items-center justify-center bg-[#111] rounded-lg border border-[#e028e0]/30 text-[10px] text-[#a0a0b0] p-1 truncate break-all">
+                        {fileContent.substring(0, 50)}...
+                      </div>
+                    )}
                     <button 
-                      onClick={() => setPendingImages(prev => prev.filter((_, idx) => idx !== i))}
+                      onClick={() => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X size={12} />
@@ -1183,41 +1572,17 @@ export default function Chat() {
             )}
 
             <div className="relative flex items-end gap-2">
-              {/* Command Menu */}
-              <AnimatePresence>
-                {showCommandMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-0 w-full mb-2 bg-[#050505] border border-[#20e0e0]/30 rounded-xl shadow-2xl overflow-hidden z-30"
-                  >
-                    <div className="p-2 bg-[#0a0a0a]/50 border-b border-[#b020ff]/30 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-[#4060ff]/80 uppercase tracking-widest px-2">{t.availableCommands}</span>
-                      <X size={12} className="text-[#4060ff]/80 cursor-pointer" onClick={() => setShowCommandMenu(false)} />
-                    </div>
-                    <div className="max-h-48 overflow-y-auto">
-                      {activeAgent.commands?.map((cmd, i) => (
-                        <button
-                          key={i}
-                          onClick={() => executeCommand(cmd)}
-                          className="w-full flex items-center gap-3 p-3 hover:bg-[#20e0e0]/10 text-left transition-colors group"
-                        >
-                          <span className="text-[#4060ff] font-mono text-sm font-bold">{cmd.command}</span>
-                          <span className="text-xs text-[#4060ff]/80 group-hover:text-white">{cmd.description}</span>
-                        </button>
-                      ))}
-                      {(!activeAgent.commands || activeAgent.commands.length === 0) && (
-                        <div className="p-4 text-center text-xs text-[#4060ff]/60 italic">
-                          No commands available for {activeAgent.name}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Floating Command Palette Popup */}
+              <CommandPalettePopup
+                isOpen={showCommandMenu}
+                filterText={commandPaletteFilter}
+                onSelect={(cmd) => handleSelectClaudeCommand(cmd)}
+                onClose={() => setShowCommandMenu(false)}
+                selectedIndex={commandPaletteSelectedIndex}
+                setSelectedIndex={setCommandPaletteSelectedIndex}
+              />
 
-              <div className="flex-1 bg-[#0a0a0a] border border-[#e028e0]/30 rounded-2xl focus-within:ring-2 focus-within:ring-[#20e0e0]/50 transition-all">
+              <div className="flex-1 bg-[#0a0a0a] border border-[#e028e0]/40 rounded-2xl focus-within:ring-2 focus-within:ring-[#20e0e0]/50 focus-within:border-[#20e0e0] transition-all">
                 <textarea
                   rows={1}
                   value={input}
@@ -1225,47 +1590,65 @@ export default function Chat() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      sendMessage(input);
+                      handleSendWithCommand(input);
                     }
                   }}
-                  placeholder={selectedModel === "gemini-2.5-flash-image" ? t.describeImage : t.askGemini}
-                  className="w-full bg-transparent border-none focus:ring-0 p-4 text-sm resize-none min-h-[52px] max-h-48 scrollbar-hide"
+                  placeholder={selectedModel === "gemini-2.5-flash-image" ? t.describeImage : (activeCommand ? `Type your prompt for ${activeCommand.command}...` : t.askGemini)}
+                  className="w-full bg-transparent border-none focus:ring-0 p-3.5 text-sm resize-none min-h-[52px] max-h-48 scrollbar-hide text-white placeholder:text-white/40"
                   disabled={loading}
                 />
-                <div className="flex items-center justify-between px-3 pb-3">
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center justify-between px-3 pb-2.5">
+                  <div className="flex items-center gap-1.5">
                     <button 
                       onClick={() => fileInputRef.current?.click()}
                       className="p-2 hover:bg-[#111] rounded-xl text-[#4060ff]/80 hover:text-[#4060ff] transition-colors"
                       title={t.uploadImageTitle}
                     >
-                      <ImageIcon size={20} />
+                      <ImageIcon size={18} />
                     </button>
                     <input 
                       type="file" 
                       ref={fileInputRef} 
-                      onChange={handleImageUpload} 
+                      onChange={handleFileUpload} 
                       multiple 
-                      accept="image/*" 
+                      accept="image/*,.ts,.tsx,.js,.jsx,.py,.css,.html,.json,.md,.txt" 
                       hidden 
                     />
+                    
                     <button 
                       onClick={() => setIsStreaming(!isStreaming)}
                       className={cn(
-                        "p-2 rounded-xl transition-colors text-xs font-bold px-3",
-                        isStreaming ? "text-[#20e0e0] bg-[#20e0e0]/10" : "text-[#20e0e0]/40 bg-[#111]"
+                        "p-1.5 rounded-lg transition-colors text-[10px] font-mono font-bold px-2.5 border",
+                        isStreaming 
+                          ? "text-[#20e0e0] bg-[#20e0e0]/10 border-[#20e0e0]/30" 
+                          : "text-[#20e0e0]/40 bg-[#111] border-white/10"
                       )}
                     >
-                      {isStreaming ? "STREAM" : "STATIC"}
+                      {isStreaming ? "STREAM ON" : "STATIC"}
+                    </button>
+
+                    {/* Real-time Token Counter */}
+                    <span className="text-[10px] font-mono text-white/40 px-2 hidden sm:inline">
+                      {estimateTokens(input).tokens} tokens
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSendWithCommand(input)}
+                      disabled={loading || (!input.trim() && !pendingFiles.length)}
+                      className="bg-gradient-to-r from-[#e028e0] to-[#b020ff] hover:from-[#e028e0]/90 hover:to-[#b020ff]/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-[0_0_15px_rgba(224,40,224,0.4)] flex items-center gap-1.5 font-bold text-xs"
+                    >
+                      {loading ? (
+                        <Loader2 className="animate-spin" size={16} />
+                      ) : (
+                        <>
+                          <span>{t.send}</span>
+                          <Send size={14} />
+                        </>
+                      )}
                     </button>
                   </div>
-                  <button
-                    onClick={() => sendMessage(input)}
-                    disabled={loading || (!input.trim() && !pendingImages.length)}
-                    className="bg-[#e028e0] hover:bg-[#e028e0]/80 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2.5 rounded-xl transition-all shadow-lg shadow-[0_0_10px_rgba(255,0,60,0.5)]"
-                  >
-                    {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                  </button>
                 </div>
               </div>
             </div>
@@ -1273,10 +1656,45 @@ export default function Chat() {
         </footer>
       </main>
 
-      {/* Mobile Overlay */}
+      {/* Claude Commands Modal Playbook */}
+      <ClaudeCommandsModal
+        isOpen={isClaudeModalOpen}
+        onClose={() => setIsClaudeModalOpen(false)}
+        onSelectCommand={handleSelectClaudeCommand}
+      />
+
+      {/* Terminal Plugins Console & Sandbox Modal */}
+      <PluginConsoleModal
+        isOpen={isPluginModalOpen}
+        onClose={() => setIsPluginModalOpen(false)}
+        plugins={plugins}
+        onTogglePlugin={togglePlugin}
+        onInsertOptimizedPrompt={(prompt) => {
+          setInput(prompt);
+          setIsPluginModalOpen(false);
+        }}
+      />
+
+      {/* Agent Creator & Skill Generator Modal */}
+      <AgentCreatorModal
+        isOpen={isAgentCreatorOpen}
+        onClose={() => setIsAgentCreatorOpen(false)}
+        onSaveAgent={(agent, activateImmediately) => {
+          saveAgent(agent);
+          if (activateImmediately) {
+            selectAgent(agent);
+          }
+        }}
+        onDeleteAgent={(id) => removeAgentFromStorage(id)}
+        customAgents={customAgents}
+        activeAgentId={activeAgent.id}
+        initialQuery={agentSearchQuery}
+      />
+
+      {/* Mobile Overlay Backdrop */}
       {isSidebarOpen && (
         <div 
-          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-10"
+          className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-30 transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -1298,17 +1716,29 @@ export default function Chat() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-5xl bg-[#050505] border border-[#b020ff]/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
             >
-              <div className="p-6 border-b border-[#b020ff]/30 flex items-center justify-between bg-[#050505]/50 backdrop-blur-md">
+              <div className="p-4 sm:p-6 border-b border-[#b020ff]/30 flex items-center justify-between bg-[#050505]/80 backdrop-blur-md">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">{t.agentLibrary}</h2>
-                  <p className="text-sm text-[#a0a0b0]/80">{t.chooseSpecialist}</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">{t.agentLibrary}</h2>
+                  <p className="text-xs sm:text-sm text-[#a0a0b0]/80">{t.chooseSpecialist}</p>
                 </div>
-                <button 
-                  onClick={() => setIsLibraryOpen(false)}
-                  className="p-2 hover:bg-[#0a0a0a] rounded-full text-[#e028e0]/80 transition-colors"
-                >
-                  <X size={24} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsLibraryOpen(false);
+                      setIsAgentCreatorOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-[#20e0e0] to-[#b020ff] hover:opacity-90 text-black font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-[0_0_12px_rgba(32,224,224,0.4)] transition-all"
+                  >
+                    <Cpu size={14} />
+                    <span>Create / Generate</span>
+                  </button>
+                  <button 
+                    onClick={() => setIsLibraryOpen(false)}
+                    className="p-2 hover:bg-[#0a0a0a] rounded-full text-[#e028e0]/80 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-1 overflow-hidden">

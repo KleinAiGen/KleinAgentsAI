@@ -1,5 +1,6 @@
 {
   "name": "AgentKlein AI",
   "description": "An AI-powered chat interface using Gemini Pro, Gwen 3.5 model.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

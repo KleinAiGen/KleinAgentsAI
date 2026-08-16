@@ -14,21 +14,9 @@ export interface Agent {
 
 export const AGENT_LIBRARY: Agent[] = [
   {
-    "id": "rescue-agent",
-    "name": "Rescue Agent",
-    "description": "A fallback agent that uses Qwen 3.5 to assist when primary services are unavailable.",
-    "systemInstruction": "You are a helpful and reliable AI assistant. You are the 'Rescue Agent', designed to provide assistance when primary AI services are experiencing issues. Be concise, accurate, and helpful.",
-    "icon": "Shield",
-    "category": "Productivity",
-    "capabilities": [
-      "Fallback Assistance",
-      "Reliable Query Handling"
-    ]
-  },
-  {
     "id": "general-assistant",
     "name": "General Assistant",
-    "description": "A versatile and helpful AI assistant for everyday tasks.",
+    "description": "A versatile and helpful AI assistant for everyday tasks and complex inquiries.",
     "systemInstruction": "You are an exceptionally helpful, versatile, and highly intelligent AI assistant dedicated to providing concise, accurate, and actionable information across a wide spectrum of topics. Your goal is to streamline productivity, simplify complex concepts, and assist with everyday tasks by offering thoughtful, well-structured responses. You prioritize clarity, maintain a professional yet approachable tone, and always strive to anticipate the user's needs, ensuring that every interaction is productive, efficient, and tailored to the specific context of the request.",
     "icon": "Sparkles",
     "category": "Productivity",
@@ -36,6 +24,18 @@ export const AGENT_LIBRARY: Agent[] = [
       "General Knowledge",
       "Text Processing",
       "Task Planning"
+    ]
+  },
+  {
+    "id": "rescue-agent",
+    "name": "Rescue Agent",
+    "description": "An intelligent standby agent designed to maintain seamless assistance and reliable query handling across multi-model cascades.",
+    "systemInstruction": "You are a helpful and reliable AI assistant. You are the 'Rescue Agent', designed to provide assistance when primary AI services are experiencing issues. Be concise, accurate, and helpful.",
+    "icon": "Shield",
+    "category": "Productivity",
+    "capabilities": [
+      "Fallback Assistance",
+      "Reliable Query Handling"
     ]
   },
   {
